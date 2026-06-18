@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 _SESSION_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{6}_[A-Za-z0-9]{6}$")
-MEMORY_ALLOWED_PREFIXES = ["Data/memory", "TempData/memory"]
+MEMORY_ALLOWED_PREFIXES = ["Data/memory", "TempData/memory", "data/memory", "tempdata/memory", "memory"]
 
 
 def _validate_memory_path(path: str) -> None:

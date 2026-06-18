@@ -266,5 +266,7 @@ def create_app(
     return app
 
 
-# uvicorn 入口
-app = create_app()
+# uvicorn 入口：仅在直接运行本文件时创建 app
+# 正常使用请通过 Code/main.py web 模式启动
+if __name__ == "__main__":
+    app = create_app()
