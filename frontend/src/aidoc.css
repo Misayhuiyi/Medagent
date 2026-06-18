@@ -1,0 +1,1619 @@
+:root {
+  --aidoc-blue: #007aff;
+  --aidoc-blue-light: #e6f4ff;
+  --aidoc-bg: #f5f7fa;
+  --aidoc-panel-bg: #ffffff;
+  --aidoc-chat-bg: #f5f5f5;
+  --aidoc-soft-bg: #f8f9fa;
+  --aidoc-border: #e5e5e5;
+  --aidoc-text: #383838;
+  --aidoc-text-strong: #000000;
+  --aidoc-text-secondary: #808080;
+  --aidoc-text-muted: #a6a6a6;
+  --aidoc-red: #d9232e;
+  --aidoc-success: #34c759;
+  --aidoc-warning: #ff9500;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  background: #f5f7fa;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.aidoc-stage {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--aidoc-bg);
+}
+
+.app-shell.aidoc-v2 {
+  width: min(1420px, 100vw);
+  height: 100vh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--aidoc-panel-bg);
+}
+
+.app-shell.aidoc-v2 .topbar {
+  width: 100%;
+  height: 59.15px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--aidoc-border);
+  background: var(--aidoc-panel-bg);
+}
+
+.aidoc-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aidoc-logo-crop {
+  width: 53px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.aidoc-logo-crop img {
+  width: auto;
+  height: 28px;
+  display: block;
+}
+
+.aidoc-brand-badge {
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--aidoc-blue);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.app-shell.aidoc-v2 .workspace {
+  height: calc(100vh - 59.15px);
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 218px minmax(0, 1fr) minmax(0, 42.5%);
+  overflow: hidden;
+}
+
+.app-shell.aidoc-v2 .left-panel {
+  width: 218px;
+  min-width: 218px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--aidoc-border);
+  background: var(--aidoc-panel-bg);
+}
+
+.app-shell.aidoc-v2 .sidebar-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-shell.aidoc-v2 .consult-entry {
+  width: 198px;
+  height: 45px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--aidoc-blue);
+  color: #fff;
+  font-size: 20px;
+  line-height: 29px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .consult-icon,
+.app-shell.aidoc-v2 .consult-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.app-shell.aidoc-v2 .consult-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .patient-toolbar {
+  width: 198px;
+  height: 24px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-shell.aidoc-v2 .patient-toolbar > span {
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 23px;
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .sidebar-add-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--aidoc-blue);
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .sidebar-add-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.app-shell.aidoc-v2 .search-wrap {
+  width: 198px;
+  height: 29px;
+  margin-top: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--aidoc-border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+}
+
+.app-shell.aidoc-v2 .search-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--aidoc-text-muted);
+  flex: none;
+}
+
+.app-shell.aidoc-v2 .search-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.app-shell.aidoc-v2 .search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--aidoc-text);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.app-shell.aidoc-v2 .search-input::placeholder {
+  color: var(--aidoc-text-muted);
+}
+
+.app-shell.aidoc-v2 .patient-tree-list {
+  width: 198px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.app-shell.aidoc-v2 .tree-empty {
+  padding: 12px 0;
+  color: var(--aidoc-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.app-shell.aidoc-v2 .patient-item {
+  width: 198px;
+}
+
+.app-shell.aidoc-v2 .patient-row {
+  width: 198px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.app-shell.aidoc-v2 .tree-node {
+  min-height: 24px;
+  padding: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--aidoc-text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .tree-node:hover,
+.app-shell.aidoc-v2 .tree-node.is-active {
+  color: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .patient-node {
+  width: 174px;
+  color: var(--aidoc-text-strong);
+}
+
+.app-shell.aidoc-v2 .patient-node .tree-label {
+  font-size: 16px;
+  line-height: 23px;
+  font-weight: 500;
+}
+.app-shell.aidoc-v2 .patient-dates {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.app-shell.aidoc-v2 .patient-date-item {
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 400;
+  color: var(--aidoc-text-secondary);
+}
+
+.app-shell.aidoc-v2 .encounter-node {
+  width: 100%;
+  min-height: 24px;
+  margin-top: 4px;
+  padding-left: 4px;
+  color: var(--aidoc-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+.app-shell.aidoc-v2 .encounter-item:first-child .encounter-node {
+  margin-top: 6px;
+}
+.app-shell.aidoc-v2 .encounter-node.is-active {
+  color: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .report-node {
+  width: 100%;
+  min-height: 22px;
+  padding-left: 22px;
+  font-size: 13px;
+  color: var(--aidoc-text-secondary);
+}
+
+.app-shell.aidoc-v2 .file-node {
+  width: 100%;
+  min-height: 22px;
+  padding-left: 44px;
+  gap: 4px;
+  align-items: flex-start;
+  font-size: 12px;
+  color: var(--aidoc-text-muted);
+}
+
+.app-shell.aidoc-v2 .tree-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell.aidoc-v2 .tree-chevron {
+  width: 10px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  transition: transform 120ms ease;
+  transform-origin: center;
+  flex: none;
+}
+
+.app-shell.aidoc-v2 .tree-chevron.is-expanded {
+  transform: rotate(90deg);
+}
+
+.app-shell.aidoc-v2 .tree-chevron svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .aidoc-patient-icon {
+  width: 12px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  color: currentColor;
+  flex: none;
+}
+
+.app-shell.aidoc-v2 .aidoc-patient-icon svg {
+  width: 12px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.app-shell.aidoc-v2 .patient-delete-btn {
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--aidoc-text-secondary);
+  cursor: pointer;
+  flex: none;
+}
+
+.app-shell.aidoc-v2 .patient-delete-btn:hover:not(:disabled) {
+  color: var(--aidoc-red);
+}
+
+.app-shell.aidoc-v2 .patient-delete-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+.app-shell.aidoc-v2 .patient-delete-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .tree-icon,
+.app-shell.aidoc-v2 .file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.app-shell.aidoc-v2 .tree-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--aidoc-text);
+}
+
+.app-shell.aidoc-v2 .tree-icon--category {
+  color: var(--aidoc-text-secondary);
+}
+
+.app-shell.aidoc-v2 .encounter-node.is-active .tree-icon--calendar,
+.app-shell.aidoc-v2 .report-node.is-active .tree-icon--category,
+.app-shell.aidoc-v2 .report-node:hover .tree-icon--category {
+  color: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .tree-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .file-icon {
+  width: 11px;
+  height: 14px;
+  margin-top: 5px;
+  color: var(--aidoc-red);
+}
+
+.app-shell.aidoc-v2 .file-icon svg {
+  width: 11px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .file-label {
+  max-width: 112px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  white-space: pre-line;
+}
+
+.app-shell.aidoc-v2 .file-node.is-active .file-label,
+.app-shell.aidoc-v2 .file-node:hover .file-label {
+  color: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .sidebar-logos {
+  width: 218px;
+  height: 106px;
+  margin: auto -10px 0;
+  padding: 34px 16px 10px;
+  border-top: 1px solid var(--aidoc-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-shell.aidoc-v2 .sidebar-logo-row {
+  min-height: 15px;
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-items: center;
+  column-gap: 4px;
+}
+
+.app-shell.aidoc-v2 .sidebar-logo-mark {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.app-shell.aidoc-v2 .sidebar-logo-texts {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.app-shell.aidoc-v2 .sidebar-logo-cn {
+  width: 168px;
+  max-width: 100%;
+  height: 10px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.app-shell.aidoc-v2 .sidebar-logo-en {
+  width: 168px;
+  max-width: 100%;
+  height: 5px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.app-shell.aidoc-v2 .sidebar-logo-en-short {
+  width: 103px;
+}
+
+.app-shell.aidoc-v2 .chat-panel {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--aidoc-border);
+  background: var(--aidoc-chat-bg);
+  --aidoc-chat-input-max-height: 144px;
+}
+
+.app-shell.aidoc-v2 .chat-header {
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border-top: 1px solid var(--aidoc-border);
+  border-bottom: 1px solid var(--aidoc-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(0deg, rgba(222, 242, 255, 0.56) 0%, rgba(255, 255, 255, 0.31) 48%);
+}
+
+.app-shell.aidoc-v2 .chat-header-left,
+.app-shell.aidoc-v2 .conversation-tabs {
+  height: 44px;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.app-shell.aidoc-v2 .conversation-tab {
+  min-width: 110px;
+  height: 44px;
+  padding: 0 10px 0 12px;
+  border-right: 1px solid var(--aidoc-border);
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  color: var(--aidoc-text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+
+.app-shell.aidoc-v2 .conversation-tab.is-active {
+  background: #fff;
+  color: var(--aidoc-blue);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.app-shell.aidoc-v2 .conversation-tab-main {
+  height: 44px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  flex: 1;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .conversation-tab-label {
+  min-width: 64px;
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 24px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  white-space: nowrap;
+}
+
+.app-shell.aidoc-v2 .conversation-tab:not(.is-active) .conversation-tab-label {
+  font-weight: 400;
+}
+
+.app-shell.aidoc-v2 .conversation-tab-close,
+.app-shell.aidoc-v2 .conversation-add-btn {
+  padding: 0;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .conversation-tab-close {
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  color: var(--aidoc-text-muted);
+}
+
+.app-shell.aidoc-v2 .conversation-tab-close:disabled {
+  opacity: 0.45;
+}
+
+.app-shell.aidoc-v2 .conversation-add-btn {
+  width: 30px;
+  height: 44px;
+  color: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .conversation-tab-close svg,
+.app-shell.aidoc-v2 .conversation-add-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+.app-shell.aidoc-v2 .conversation-tab-close svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.5;
+}
+
+.app-shell.aidoc-v2 .conversation-add-btn svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
+.app-shell.aidoc-v2 .switch-wrap {
+  width: 129px;
+  height: 44px;
+  margin-left: auto;
+  padding-right: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .switch-wrap input {
+  display: none;
+}
+
+.app-shell.aidoc-v2 .switch-track {
+  width: 38px;
+  height: 20px;
+  border-radius: 20px;
+  position: relative;
+  background: #d1d5db;
+  transition: background 0.2s;
+}
+.app-shell.aidoc-v2 .switch-track.is-on {
+  background: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .switch-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  transition: left 0.2s;
+}
+.app-shell.aidoc-v2 .switch-track.is-on::after {
+  left: 21px;
+}
+
+.app-shell.aidoc-v2 .message-list {
+  flex: 1;
+  min-height: 0;
+  padding: 24px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--aidoc-chat-bg);
+}
+
+.app-shell.aidoc-v2 .message-list__inner {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.app-shell.aidoc-v2 .message-row {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.app-shell.aidoc-v2 .message-row--assistant {
+  justify-content: flex-start;
+}
+
+.app-shell.aidoc-v2 .message-row--status {
+  width: 100%;
+  padding-left: 52px;
+  justify-content: flex-start;
+}
+
+.app-shell.aidoc-v2 .message-row--user {
+  width: 100%;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.app-shell.aidoc-v2 .message-avatar {
+  width: 40px;
+  height: 40px;
+  margin-top: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+  overflow: hidden;
+}
+
+.app-shell.aidoc-v2 .message-avatar img {
+  width: 40px;
+  height: 40px;
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.app-shell.aidoc-v2 .message-bubble {
+  min-height: 36px;
+  max-width: min(72%, 400px);
+  padding: 8px 14px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  color: var(--aidoc-text);
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.app-shell.aidoc-v2 .message-bubble--assistant {
+  width: auto;
+  border: 1px solid #edf0f4;
+  border-bottom-left-radius: 4px;
+  background: #fff;
+}
+
+.app-shell.aidoc-v2 .message-bubble--user {
+  width: fit-content;
+  max-width: min(72%, 360px);
+  border: none;
+  border-bottom-right-radius: 4px;
+  background: linear-gradient(180deg, #148bff 0%, var(--aidoc-blue) 100%);
+  color: #fff;
+  box-shadow: 0 2px 7px rgba(0, 120, 255, 0.18);
+}
+
+.app-shell.aidoc-v2 .message-bubble--status {
+  width: fit-content;
+  min-height: 38px;
+  max-width: 220px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  text-align: left;
+  color: var(--aidoc-text-secondary);
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.app-shell.aidoc-v2 .message-bubble--status .message-bubble__content {
+  width: auto;
+  height: auto;
+  overflow: hidden;
+}
+
+.app-shell.aidoc-v2 .message-status-icon {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--aidoc-text-secondary);
+}
+
+.app-shell.aidoc-v2 .message-status-icon svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.app-shell.aidoc-v2 .message-bubble p {
+  margin: 0;
+}
+
+.app-shell.aidoc-v2 .message-bubble__content {
+  min-width: 0;
+}
+
+.app-shell.aidoc-v2 .reasoning-block {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid #edf0f4;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--aidoc-text-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.app-shell.aidoc-v2 .reasoning-block--compact {
+  padding: 4px 12px;
+  font-style: italic;
+}
+
+
+.app-shell.aidoc-v2 .reasoning-complete {
+  margin: 4px 0;
+  color: var(--aidoc-text-muted);
+  font-size: 12px;
+}
+
+.app-shell.aidoc-v2 .reasoning-content {
+  margin-top: 0;
+}
+
+.app-shell.aidoc-v2 .chat-input-area {
+  width: auto;
+  min-height: 52px;
+  margin: 0 16px 16px;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.app-shell.aidoc-v2 .chat-input-area textarea {
+  min-height: 22px;
+  max-height: var(--aidoc-chat-input-max-height);
+  padding: 2px 0;
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  overflow-y: auto;
+  background: transparent;
+  color: var(--aidoc-text);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.app-shell.aidoc-v2 .chat-input-area textarea::placeholder {
+  color: var(--aidoc-text-muted);
+}
+
+.app-shell.aidoc-v2 .chat-input-addon,
+.app-shell.aidoc-v2 .chat-input-send {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .chat-input-addon {
+  background: transparent;
+  color: var(--aidoc-text-secondary);
+}
+
+.app-shell.aidoc-v2 .chat-input-send {
+  border-radius: 50%;
+  background: #d1d5db;
+  color: #fff;
+}
+
+.app-shell.aidoc-v2 .chat-input-send:not(:disabled) {
+  background: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .chat-input-addon:disabled,
+.app-shell.aidoc-v2 .chat-input-send:disabled {
+  cursor: not-allowed;
+}
+
+.app-shell.aidoc-v2 .chat-input-addon:disabled {
+  opacity: 0.45;
+}
+
+.app-shell.aidoc-v2 .chat-input-addon svg,
+.app-shell.aidoc-v2 .chat-input-send svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .report-panel {
+  width: auto;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid var(--aidoc-border);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: var(--aidoc-panel-bg);
+}
+
+.app-shell.aidoc-v2 .report-panel__header {
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  flex: none;
+  background: linear-gradient(0deg, rgba(222, 242, 255, 0.56) 0%, rgba(255, 255, 255, 0.31) 48%);
+}
+
+.app-shell.aidoc-v2 .result-tabs {
+  height: 44px;
+  display: flex;
+}
+
+.app-shell.aidoc-v2 .result-tab {
+  min-width: 96px;
+  height: 44px;
+  padding: 0 16px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 23px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .result-tab.is-active {
+  background: var(--aidoc-soft-bg);
+  color: var(--aidoc-blue);
+  font-weight: 500;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.app-shell.aidoc-v2 .report-edit-actions {
+  margin-left: auto;
+  padding-right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-shell.aidoc-v2 .report-edit-actions .ant-btn {
+  border-radius: 8px;
+}
+
+.app-shell.aidoc-v2 .report-edit-actions svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .report-panel__body {
+  height: auto;
+  min-height: 0;
+  padding: 16px;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.app-shell.aidoc-v2 .report-tab-content {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-x: hidden;
+}
+
+.app-shell.aidoc-v2 .figma-card,
+.app-shell.aidoc-v2 .figma-card-group {
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.app-shell.aidoc-v2 .figma-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app-shell.aidoc-v2 .figma-card-group__title {
+  min-height: 24px;
+  padding-left: 24px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 23px;
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .figma-card-group__title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--aidoc-blue-light);
+  transform: translateY(-50%);
+}
+
+.app-shell.aidoc-v2 .figma-card-group__title::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--aidoc-blue);
+  transform: translateY(-50%);
+}
+
+.app-shell.aidoc-v2 .figma-card__header {
+  width: 100%;
+  height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--aidoc-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--aidoc-soft-bg);
+  color: inherit;
+  font: inherit;
+}
+
+.app-shell.aidoc-v2 .figma-card__icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--aidoc-blue);
+  flex: none;
+}
+
+.app-shell.aidoc-v2 .figma-card__icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .figma-card__title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--aidoc-text-strong);
+  font-size: 16px;
+  line-height: 28px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell.aidoc-v2 .figma-card__body {
+  margin-top: -1px;
+  padding: 12px 16px;
+  border: 1px solid var(--aidoc-border);
+  background: #fff;
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 28px;
+  text-align: justify;
+}
+
+.app-shell.aidoc-v2 .figma-card.is-expanded .figma-card__body {
+  overflow-y: auto;
+}
+  scrollbar-width: thin;
+}
+
+.app-shell.aidoc-v2 .figma-card.is-expanded .figma-card__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-shell.aidoc-v2 .figma-card.is-expanded .figma-card__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(0, 122, 255, 0.28);
+}
+
+.app-shell.aidoc-v2 .figma-card__text {
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 28px;
+  text-align: justify;
+}
+
+.app-shell.aidoc-v2 .figma-card__footer {
+  height: 40px;
+  margin-top: -1px;
+  padding: 8px 16px;
+  border: 1px solid var(--aidoc-border);
+  display: flex;
+  align-items: center;
+  background: var(--aidoc-bg);
+}
+
+.app-shell.aidoc-v2 .figma-card__evidence {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--aidoc-text);
+  font-size: 12px;
+  line-height: 17px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-shell.aidoc-v2 .figma-card__trace {
+  margin: 0 8px;
+  padding: 0;
+  border: none;
+  flex: none;
+  background: transparent;
+  color: var(--aidoc-blue);
+  font-size: 13px;
+  line-height: 23px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.app-shell.aidoc-v2 .figma-card__trace:hover {
+  text-decoration: underline;
+}
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.app-shell.aidoc-v2 .figma-card__level {
+  min-width: 40px;
+  height: 21px;
+  padding: 0 8px;
+  border-radius: 35px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: var(--aidoc-blue-light);
+  color: var(--aidoc-blue);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.app-shell.aidoc-v2 .report-text--subitem {
+  margin-bottom: 8px;
+}
+
+.app-shell.aidoc-v2 .report-text--compact {
+  padding-top: 4px;
+}
+
+.app-shell.aidoc-v2 .report-text--emphasis {
+  padding-top: 4px;
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .report-stat-value {
+  padding: 8px 0;
+  color: var(--aidoc-blue);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .assessment-card__meta,
+.app-shell.aidoc-v2 .efficacy-row {
+  color: var(--aidoc-text);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.app-shell.aidoc-v2 .efficacy-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.app-shell.aidoc-v2 .lesion-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.app-shell.aidoc-v2 .lesion-table th,
+.app-shell.aidoc-v2 .lesion-table td {
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.app-shell.aidoc-v2 .lesion-table th {
+  background: var(--aidoc-soft-bg);
+  color: var(--aidoc-text-secondary);
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .lesion-table td {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.app-shell.aidoc-v2 .lesion-table .is-numeric {
+  text-align: right;
+}
+
+.app-shell.aidoc-v2 .lesion-table__id {
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .lesion-table .is-improved {
+  color: var(--aidoc-success);
+}
+
+.app-shell.aidoc-v2 .lesion-table .is-worse {
+  color: #ff3b30;
+}
+
+.app-shell.aidoc-v2 .lesion-table .is-stable {
+  color: var(--aidoc-text-secondary);
+}
+
+.app-shell.aidoc-v2 .report-chart {
+  height: 200px !important;
+  margin: 8px 0;
+}
+
+.app-shell.aidoc-v2 .report-chart--large {
+  height: 220px !important;
+}
+
+.app-shell.aidoc-v2 .report-timeline {
+  padding: 0;
+}
+
+.app-shell.aidoc-v2 .report-timeline__item {
+  margin-bottom: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.app-shell.aidoc-v2 .report-timeline__axis {
+  width: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app-shell.aidoc-v2 .report-timeline__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.app-shell.aidoc-v2 .report-timeline__line {
+  width: 1px;
+  margin-top: 4px;
+  flex: 1;
+  background: var(--aidoc-border);
+}
+
+.app-shell.aidoc-v2 .report-timeline__content {
+  flex: 1;
+}
+
+.app-shell.aidoc-v2 .report-timeline__title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .report-timeline__text {
+  margin-top: 2px;
+  color: var(--aidoc-text);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.app-shell.aidoc-v2 .report-muted-block {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--aidoc-soft-bg);
+  color: var(--aidoc-text-muted);
+  text-align: center;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-card,
+.app-shell.aidoc-v2 .clinical-trial-card {
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-name,
+.app-shell.aidoc-v2 .treatment-plan-score {
+  color: var(--aidoc-text-strong);
+  font-size: 16px;
+  line-height: 28px;
+  font-weight: 400;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-score {
+  color: var(--aidoc-blue);
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .treatment-strategy-tag {
+  border-radius: 35px;
+  font-size: 12px;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-card__body {
+  padding: 12px 16px;
+  border: 1px solid var(--aidoc-border);
+  border-top: none;
+  background: #fff;
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 28px;
+  text-align: justify;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-evidence {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--aidoc-text);
+  font-size: 12px;
+  line-height: 17px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-detail {
+  margin-top: 12px;
+}
+
+.app-shell.aidoc-v2 .treatment-plan-detail-item {
+  margin-top: 4px;
+}
+
+.app-shell.aidoc-v2 .score-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app-shell.aidoc-v2 .score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.app-shell.aidoc-v2 .score-label {
+  width: 56px;
+  flex: none;
+  color: var(--aidoc-text-secondary);
+  white-space: nowrap;
+}
+
+.app-shell.aidoc-v2 .score-track {
+  height: 6px;
+  border-radius: 3px;
+  flex: 1;
+  overflow: hidden;
+  background: #eef1f5;
+}
+
+.app-shell.aidoc-v2 .score-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.app-shell.aidoc-v2 .score-value {
+  width: 36px;
+  font-size: 12px;
+  text-align: right;
+}
+
+.app-shell.aidoc-v2 .clinical-trial-card {
+  padding: 12px 16px;
+  border: 1px solid var(--aidoc-border);
+  background: #fff;
+  color: var(--aidoc-text);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.app-shell.aidoc-v2 .clinical-trial-card.is-match {
+  background: #f0faf3;
+}
+
+.app-shell.aidoc-v2 .clinical-trial-card__header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+}
+
+.app-shell.aidoc-v2 .clinical-trial-card__meta {
+  margin-top: 2px;
+  color: var(--aidoc-text-secondary);
+}
+
+
+.app-shell.aidoc-v2 .report-panel__footer {
+  flex: none;
+  padding: 6px 16px;
+  border-top: 1px solid var(--aidoc-border);
+  background: #fff;
+}
+.app-shell.aidoc-v2 .report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.app-shell.aidoc-v2 .report-actions .ant-btn {
+  height: 36px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--aidoc-blue);
+  color: #fff;
+  font-size: 16px;
+  line-height: 23px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.app-shell.aidoc-v2 .report-actions .ant-btn:first-child,
+.app-shell.aidoc-v2 .report-actions .ant-btn:last-child {
+  width: auto;
+  min-width: 100px;
+}
+
+.app-shell.aidoc-v2 .report-actions .ant-btn-primary {
+  background: var(--aidoc-blue);
+}
+
+.app-shell.aidoc-v2 .report-actions svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.aidoc-v2 .empty-state {
+  height: 100%;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--aidoc-text-muted);
+  font-size: 14px;
+}
+
+/* ── 证据溯源：表格横向滚动 ── */
+.trace-table-wrap {
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.trace-table-wrap table {
+  font-size: 11px;
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+}
+.trace-table-wrap th,
+.trace-table-wrap td {
+  padding: 4px 8px;
+  border: 1px solid var(--aidoc-border);
+  vertical-align: top;
+  text-align: left;
+}
+.trace-table-wrap th {
+  background: #f8f8f8;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.trace-table-wrap td {
+  max-width: 180px;
+  word-break: break-word;
+}
+

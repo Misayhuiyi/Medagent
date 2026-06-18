@@ -1,0 +1,121 @@
+"""知识库抽象接口 + Mock 实现 + RAG 实现 + 证据等级定义。"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import sys
+from pathlib import Path
+from typing import Protocol, TypedDict, runtime_checkable
+
+logger = logging.getLogger(__name__)
+
+
+class EvidenceLevel:
+    """证据等级定义，数值越高越权威。"""
+    INTERNATIONAL_GUIDELINE = (7, "国际权威指南")
+    NATIONAL_GUIDELINE = (6, "国内权威指南")
+    INTERNATIONAL_CONSENSUS = (5, "国际专家共识")
+    NATIONAL_CONSENSUS = (4, "国内专家共识")
+    HIGH_QUALITY_RCT = (3, "临床试验（高质量Meta分析/RCT）")
+    REAL_WORLD_STUDY = (2, "真实世界研究/观察性研究")
+    CASE_REPORT = (1, "病例系列/个案报告")
+    EXPERT_OPINION = (0, "个人专家意见")
+
+
+class KnowledgeResult(TypedDict):
+    content: str
+    source: str
+    evidence_level: int
+    evidence_label: str
+    publish_date: str
+    effective_date: str
+    guideline_edition: str
+
+
+@runtime_checkable
+class KnowledgeBase(Protocol):
+    async def query(
+        self,
+        question: str,
+        top_k: int = 3,
+        min_evidence: int = 0,
+        before_date: str | None = None,
+    ) -> list[KnowledgeResult]: ...
+
+
+class RagKnowledgeBase:
+    """基于 ChromaDB + Ollama bge-m3 + CrossEncoder 的 RAG 知识库。
+
+    调用 ai-doctor knowledge-base 的 search_guidelines 进行语义检索，
+    返回 KnowledgeResult 格式对齐现有接口。
+    """
+
+    def __init__(self, kb_dir: str):
+        self._kb_dir = Path(kb_dir)
+        if str(self._kb_dir) not in sys.path:
+            sys.path.insert(0, str(self._kb_dir))
+        self._initialized = False
+
+    def _ensure_init(self):
+        if self._initialized:
+            return
+        # 延迟导入，避免启动时加载重型依赖
+        try:
+            from tool import search_guidelines
+            self._search_fn = search_guidelines
+            self._initialized = True
+        except Exception as e:
+            logger.error("RAG knowledge base init failed: %s", e)
+            raise
+
+    async def query(
+        self,
+        question: str,
+        top_k: int = 3,
+        min_evidence: int = 0,
+        before_date: str | None = None,
+    ) -> list[KnowledgeResult]:
+        self._ensure_init()
+        try:
+            raw_results = await asyncio.to_thread(
+                self._search_fn, question, top_k, raw=True
+            )
+        except Exception as e:
+            logger.exception("RAG search failed for: %s", question[:100])
+            return []
+
+        results: list[KnowledgeResult] = []
+        for item in raw_results:
+            # Map RAG result fields to KnowledgeResult
+            content = item.get("content", "")
+            source = item.get("source", "")
+            year = str(item.get("year", ""))
+            results.append(KnowledgeResult(
+                content=content[:2000],
+                source=source,
+                evidence_level=self._map_evidence(source),
+                evidence_label=item.get("evidence_level", ""),
+                publish_date=year,
+                effective_date=year,
+                guideline_edition=item.get("guideline_edition", year),
+            ))
+        return results[:top_k]
+
+    @staticmethod
+    def _map_evidence(source: str) -> int:
+        s = source.upper()
+        if "NCCN" in s:
+            return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
+        if "ASCO" in s:
+            return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
+        if "ESMO" in s:
+            return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
+        if "CSCO" in s:
+            return EvidenceLevel.NATIONAL_GUIDELINE[0]
+        if s in ("SITC", "CTCAE"):
+            return EvidenceLevel.INTERNATIONAL_CONSENSUS[0]
+        return EvidenceLevel.EXPERT_OPINION[0]
+
+

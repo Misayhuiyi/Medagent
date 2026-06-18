@@ -1,0 +1,17 @@
+# Docker/docker-compose.yaml
+version: "3.8"
+
+services:
+  medagent:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile
+    volumes:
+      - ${NAS_PATH:-./user_data}:/app/tempdata/patients:ro
+      - ${RESULT_PATH:-./results}:/app/Result:rw
+      - ./data:/app/data:ro
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+    restart: "no"

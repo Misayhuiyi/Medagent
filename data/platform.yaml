@@ -1,0 +1,59 @@
+llm:
+  base_url: "https://api.deepseek.com/v1"
+  api_key: "sk-your-api-key"
+  api_format: "openai"
+  default_model: "deepseek-v4-flash"
+  temperature: 0.7
+  context_length: 200000
+  parallel_tool_calls: false
+
+workspace:
+  root: "/workspace/user_data"
+
+dreaming:
+  enabled: true
+  schedule: "0 3 * * *"
+  threshold: 0.7
+
+a2a:
+  enabled: true
+
+memory:
+  max_short_term: 50
+  long_term_path: "TempData/memory/long_term"
+
+context:
+  summary_threshold: 0.7
+  force_threshold: 0.9
+  keep_recent_turns: 5
+  compression_buffer_tokens: 8000
+
+sandbox:
+  workspace_root: "/workspace/user_data"
+  path_mode: "whitelist"
+  shell_mode: "blacklist"
+  shell_blacklist:
+    - "rm -rf"
+    - "sudo"
+    - "chmod 777"
+    - "mkfs"
+    - "dd if="
+    - "shutdown"
+    - "reboot"
+  network_blacklist:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+    - "localhost"
+    - "127.0.0.1"
+
+caching:
+  enabled: true
+  prompt_order:
+    - system_prompt
+    - memory
+    - session_context
+    - messages
+
+mcp_local:
+  enabled: true

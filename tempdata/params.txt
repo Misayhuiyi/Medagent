@@ -1,0 +1,42 @@
+# MedAgent 运行参数（两行格式）
+# 第一行参数名，第二行参数值
+# 空行分隔不同区块
+
+# ── 通用参数 ──
+model
+deepseek-chat
+
+temperature
+0.4
+
+context_length
+200000
+
+# ── 流水线参数 ──
+tab_timeout
+60
+
+pipeline_mode
+pipeline
+
+# ── 知识库参数 ──
+kb_top_k
+15
+
+knowledge_mode
+rag
+
+# ── OCR 参数 ──
+ocr_dpi
+200
+
+# ── 强化学习参数 ──
+enable_reinforcement
+false
+
+# ── 患者参数 ──
+patient_id
+demo
+
+visit_date
+2025-06-17

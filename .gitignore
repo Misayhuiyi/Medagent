@@ -1,0 +1,42 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+.uv/
+
+# ── 环境变量（含 API Key） ──
+.env
+
+# ── IDE / 编辑器 ──
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── 操作系统 ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── 运行产出 ──
+Result/
+memory/
+*.log
+
+# ── 前端（与 frontend/.gitignore 互补） ──
+node_modules/
+dist-ssr/
+*.local
+
+# ── 临时数据（患者文件不上传版本库） ──
+tempdata/patients/

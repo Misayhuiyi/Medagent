@@ -1,0 +1,17 @@
+# 流水线配置：定义 Skill 执行步骤和顺序
+# 接入肺癌医生流程时，只需在此注册10步主Skill即可
+
+pipeline:
+  mode: "report"  # "report" 或 "pipeline"
+  steps: []       # 部署肺癌医生流程时填充，例如：
+  # - name: "01-data-organization"
+  #   display_name: "资料整理"
+  #   skill_file: "01-data-organization/SKILL.md"
+  # - name: "02-data-preprocessing"
+  #   display_name: "资料预处理"
+  #   skill_file: "02-data-preprocessing/SKILL.md"
+  #   ...
+
+# 每个步骤的可选输出结构 schema
+# 如需结构化输出，在步骤同级目录下放置 schema.json
+# 引擎会自动读取并注入 Function Calling
