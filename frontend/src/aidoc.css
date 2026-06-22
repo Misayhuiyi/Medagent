@@ -897,6 +897,42 @@ textarea {
   margin-top: 0;
 }
 
+/* ── 快捷操作按钮 ── */
+.app-shell.aidoc-v2 .quick-actions-bar {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+.app-shell.aidoc-v2 .quick-action-btn {
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.app-shell.aidoc-v2 .quick-action-btn:hover:not(:disabled) {
+  border-color: #0071e3;
+  color: #0071e3;
+  background: #f0f6ff;
+}
+.app-shell.aidoc-v2 .quick-action-btn--primary {
+  background: #0071e3;
+  border-color: #0071e3;
+  color: #fff;
+}
+.app-shell.aidoc-v2 .quick-action-btn--primary:hover:not(:disabled) {
+  background: #005bb5;
+  border-color: #005bb5;
+  color: #fff;
+}
+.app-shell.aidoc-v2 .quick-action-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
 .app-shell.aidoc-v2 .chat-input-area {
   width: auto;
   min-height: 52px;

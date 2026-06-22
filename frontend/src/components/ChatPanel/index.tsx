@@ -32,7 +32,7 @@ export default function ChatPanel() {
   const addMessages = useChatStore((s) => s.addMessages)
   const clearMessages = useChatStore((s) => s.clearMessages)
   const setThinkingTime = useChatStore((s) => s.setThinkingTime)
-  const { sendMessage, abort } = useChat(selectedId)
+  const { sendMessage, generateReport, abort } = useChat(selectedId)
   const [showThinking, setShowThinking] = useState(true)
 
   // Thinking timer
@@ -113,6 +113,24 @@ export default function ChatPanel() {
         </label>
       </div>
       <MessageList messages={messages} showThinking={showThinking} />
+      <div className="quick-actions-bar">
+        <button
+          className="quick-action-btn"
+          type="button"
+          disabled={isStreaming}
+          onClick={() => sendMessage('请分析该患者的检查资料')}
+        >
+          文件分析
+        </button>
+        <button
+          className="quick-action-btn quick-action-btn--primary"
+          type="button"
+          disabled={isStreaming}
+          onClick={() => generateReport('请基于患者全部病历、检查报告和当前对话，生成患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。')}
+        >
+          生成报告
+        </button>
+      </div>
       <ChatInput onSend={sendMessage} disabled={isStreaming} />
     </div>
   )

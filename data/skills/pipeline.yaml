@@ -1,17 +1,55 @@
 # 流水线配置：定义 Skill 执行步骤和顺序
-# 接入肺癌医生流程时，只需在此注册10步主Skill即可
+# 阶段二：接入肺癌医生 10 步主 Skill
 
 pipeline:
-  mode: "report"  # "report" 或 "pipeline"
-  steps: []       # 部署肺癌医生流程时填充，例如：
-  # - name: "01-data-organization"
-  #   display_name: "资料整理"
-  #   skill_file: "01-data-organization/SKILL.md"
-  # - name: "02-data-preprocessing"
-  #   display_name: "资料预处理"
-  #   skill_file: "02-data-preprocessing/SKILL.md"
-  #   ...
+  mode: "report"
+  steps:
+    - name: "01-data-organization"
+      display_name: "资料整理"
+      skill_file: "01-data-organization/SKILL.md"
+      keywords: ["影像报告", "检验报告", "病历", "病理报告", "就诊时间"]
 
-# 每个步骤的可选输出结构 schema
-# 如需结构化输出，在步骤同级目录下放置 schema.json
-# 引擎会自动读取并注入 Function Calling
+    - name: "02-data-preprocessing"
+      display_name: "资料预处理"
+      skill_file: "02-data-preprocessing/SKILL.md"
+      keywords: ["PDF转换", "患者校验"]
+
+    - name: "03-loop-count-determination"
+      display_name: "循环次数确定"
+      skill_file: "03-loop-count-determination/SKILL.md"
+      keywords: ["就诊次数", "循环", "IO映射"]
+
+    - name: "04-scenario-judgment"
+      display_name: "场景判断"
+      skill_file: "04-scenario-judgment/SKILL.md"
+      keywords: ["初诊", "转诊", "复诊", "早筛"]
+
+    - name: "05-patient-history-summary"
+      display_name: "患者病史总结"
+      skill_file: "05-patient-history-summary/SKILL.md"
+      keywords: ["现病史", "既往史", "过敏史"]
+
+    - name: "06-patient-profile"
+      display_name: "患者概况"
+      skill_file: "06-patient-profile/SKILL.md"
+      keywords: ["TNM", "ECOG", "肿瘤负荷", "不良反应"]
+
+    - name: "07-treatment-plan"
+      display_name: "治疗方案"
+      skill_file: "07-treatment-plan/SKILL.md"
+      keywords: ["指南匹配", "治疗方案", "临床试验"]
+
+    - name: "08-efficacy-prediction"
+      display_name: "疗效预测"
+      skill_file: "08-efficacy-prediction/SKILL.md"
+      keywords: ["ORR", "PFS", "OS", "不良反应预测"]
+
+    - name: "09-other-suggestions"
+      display_name: "其他建议"
+      skill_file: "09-other-suggestions/SKILL.md"
+      keywords: ["健康教育", "康复", "护理"]
+
+    - name: "10-report-generation"
+      display_name: "生成报告"
+      skill_file: "10-report-generation/SKILL.md"
+      keywords: ["报告", "PDF"]

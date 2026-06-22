@@ -88,35 +88,48 @@ class RagKnowledgeBase:
 
         results: list[KnowledgeResult] = []
         for item in raw_results:
-            # Map RAG result fields to KnowledgeResult
             content = item.get("content", "")
             source = item.get("source", "")
-            year = str(item.get("year", ""))
+            year = str(item.get("publish_date", ""))
+            evidence_level = self._map_evidence(source)
             results.append(KnowledgeResult(
                 content=content[:2000],
                 source=source,
-                evidence_level=self._map_evidence(source),
-                evidence_label=item.get("evidence_level", ""),
+                evidence_level=evidence_level,
+                evidence_label=self._evidence_label_for(evidence_level),
                 publish_date=year,
                 effective_date=year,
-                guideline_edition=item.get("guideline_edition", year),
+                guideline_edition=item.get("guideline_edition", ""),
             ))
         return results[:top_k]
 
-    @staticmethod
-    def _map_evidence(source: str) -> int:
+    _evidence_mapping: dict | None = None
+
+    @classmethod
+    def _load_evidence_mapping(cls) -> dict:
+        """从 platform.yaml 加载证据等级映射（缓存）。"""
+        if cls._evidence_mapping is not None:
+            return cls._evidence_mapping
+        import yaml
+        from pathlib import Path
+        platform_path = Path(__file__).resolve().parent.parent.parent / "data" / "platform.yaml"
+        try:
+            with open(platform_path, encoding="utf-8") as f:
+                platform = yaml.safe_load(f) or {}
+            cls._evidence_mapping = platform.get("evidence_mapping", {})
+        except Exception:
+            cls._evidence_mapping = {}
+        return cls._evidence_mapping
+
+    @classmethod
+    def _map_evidence(cls, source: str) -> int:
         """根据来源名称映射证据等级（通过 platform.yaml 中 evidence_mapping 配置驱动）。
         若未配置，默认返回 EXPERT_OPINION。
         """
-        s = source.upper()
-        # 从平台配置读取证据映射（可从 config_manager 注入），未配置时回退
-        try:
-            from DataCode.config_manager import ConfigManager
-            mapping = ConfigManager._global_config.get("evidence_mapping") if hasattr(ConfigManager, "_global_config") else None
-        except Exception:
-            mapping = None
+        mapping = cls._load_evidence_mapping()
         if mapping:
-            label = mapping.get(s)
+            s = source.upper()
+            label = mapping.get(s) or mapping.get(source)
             if label == "international_guideline":
                 return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
             if label == "national_guideline":
@@ -124,5 +137,16 @@ class RagKnowledgeBase:
             if label == "international_consensus":
                 return EvidenceLevel.INTERNATIONAL_CONSENSUS[0]
         return EvidenceLevel.EXPERT_OPINION[0]
+
+    @classmethod
+    def _evidence_label_for(cls, level: int) -> str:
+        """将证据等级整数映射为人可读标签。"""
+        mapping = {
+            EvidenceLevel.INTERNATIONAL_GUIDELINE[0]: "国际权威指南",
+            EvidenceLevel.NATIONAL_GUIDELINE[0]: "国内权威指南",
+            EvidenceLevel.INTERNATIONAL_CONSENSUS[0]: "国际专家共识",
+            EvidenceLevel.EXPERT_OPINION[0]: "专家意见",
+        }
+        return mapping.get(level, "未分类")
 
 

@@ -55,5 +55,28 @@ caching:
     - session_context
     - messages
 
+evidence_mapping:
+  NCCN: "international_guideline"
+  ESMO: "international_guideline"
+  ASCO: "international_guideline"
+  IASLC: "international_guideline"
+  ESTS: "international_guideline"
+  ESTRO: "international_guideline"
+  ASTRO: "international_guideline"
+  ERS: "international_guideline"
+  ACCP: "international_guideline"
+  SITC: "international_consensus"
+  CTCAE: "international_guideline"
+  CSCO: "national_guideline"
+  "NCCN 指南": "international_guideline"
+  "NCCN 专家共识": "international_guideline"
+  "CSCO 指南": "national_guideline"
+  "CSCO 专家共识": "national_guideline"
+  "ESMO 指南": "international_guideline"
+  "ESMO 专家共识": "international_consensus"
+  "ASCO 指南": "international_guideline"
+  "SITC 专家共识": "international_consensus"
+  "CTCAE 法规": "international_guideline"
+
 mcp_local:
   enabled: true

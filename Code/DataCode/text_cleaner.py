@@ -25,8 +25,8 @@ CLEANER_SYSTEM_PROMPT = """你是医学指南文本清洗器。把 MinerU OCR �
 
 # 单个 chunk 最大字符数（超过则截断）
 MAX_CHUNK_CHARS = 1200
-# 单条清洗超时
-CLEAN_TIMEOUT_SECONDS = 30
+# 单条清洗超时（部分 KB 文本较长，需要更长时间）
+CLEAN_TIMEOUT_SECONDS = 60
 # 最大并发清洗数（后台任务，控制 API 压力）
 MAX_CONCURRENT = 3
 

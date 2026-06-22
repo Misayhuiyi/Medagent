@@ -141,6 +141,35 @@ def create_read_memory_tool(memory_store) -> ToolDef:
     )
 
 
+def create_rag_query_tool(knowledge_base) -> ToolDef:
+    """创建 RAG 知识库查询工具 — 拦截 Skill 中 exec('rag_query.py') 调用，
+    转为 KnowledgeBase.query() 语义检索。"""
+
+    async def handler(query: str, top_k: int = 5, mode: str = "retrieve") -> str:
+        import json
+        try:
+            results = await knowledge_base.query(question=query, top_k=top_k)
+            return json.dumps(results, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    return ToolDef(
+        name="rag_query",
+        description="RAG 知识库语义检索，查询指南/文献/共识等权威医学资料",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "检索查询语句"},
+                "top_k": {"type": "integer", "description": "返回结果数量，默认 5"},
+                "mode": {"type": "string", "description": "检索模式，默认 retrieve"},
+            },
+            "required": ["query"],
+        },
+        source="builtin",
+        handler=handler,
+    )
+
+
 def create_todo_tool(todo_manager, logger=None) -> ToolDef:
     """创建待办列表工具：模型通过此工具管理多步任务进度。"""
 

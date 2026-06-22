@@ -49,6 +49,7 @@ export type SSEEvent =
   | { id?: number; type: 'reasoning'; data: TokenData }
   | { id?: number; type: 'token'; data: TokenData }
   | { id?: number; type: 'tab_ready'; data: TabReadyData }
+  | { id?: number; type: 'tab_content'; data: TabContentData }
   | { id?: number; type: 'error'; data: ErrorData }
   | { id?: number; type: 'done'; data: DoneData }
 
@@ -67,6 +68,11 @@ export interface TokenData {
 export interface TabReadyData {
   tab: TabName
   data: Record<string, unknown>
+}
+
+export interface TabContentData {
+  tab: TabName
+  content: string
 }
 
 export interface ErrorData {

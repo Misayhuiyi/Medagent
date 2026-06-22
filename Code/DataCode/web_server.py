@@ -150,6 +150,11 @@ def _init_skill_executor(project_root: str) -> None:
     manager = AgentManager(config=config, registry=registry, memory=memory)
 
     kb = RagKnowledgeBase(str(root / "data" / "knowledge_base"))
+
+    # 注册 RAG 查询工具（Agent 可通过此工具检索知识库）
+    from DataCode.builtin_tools import create_rag_query_tool
+    registry.register(create_rag_query_tool(kb))
+
     executor = SkillExecutor(agent_manager=manager, knowledge_base=kb, llm_candidates=llm_candidates)
     loaded = executor.load_skills(str(root / "data" / "skills"))
     logger.info("Loaded skills: %s", loaded)

@@ -31,9 +31,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 LLM_CHAT_TIMEOUT_SECONDS = 30
 LLM_CHAT_STREAM_IDLE_TIMEOUT = 45
-LLM_TAB_TIMEOUT_SECONDS = 60
-SKILL_FILES_CHAR_BUDGET = 60000
-SKILL_PER_FILE_CHAR_BUDGET = 6000
+LLM_TAB_TIMEOUT_SECONDS = 180
+SKILL_FILES_CHAR_BUDGET = 300000
+SKILL_PER_FILE_CHAR_BUDGET = 20000
+# ReAct Agent 最大递归轮次（LangGraph 默认 25，限制后减少无效循环）
+# 步骤 05 需要 5 个子 Agent = ~12 轮，步骤 01/03 实测需要 ~18 轮，设为 20
+SKILL_RECURSION_LIMIT = 20
+
+# Pipeline step → 前端 TabName 映射
+# 步骤 1-4 为内部预处理步骤，不生成标签页
+# 步骤 5-9 映射到前端 5 个报告标签页
+# 步骤 10 为最终报告组装，不单独生成标签页
+_STEP_TO_TAB: dict[str, str] = {
+    "05-patient-history-summary": "patient-history",
+    "06-patient-profile":         "patient-overview",
+    "07-treatment-plan":          "treatment-plan",
+    "08-efficacy-prediction":     "efficacy-prediction",
+    "09-other-suggestions":       "suggestions",
+}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -233,6 +248,8 @@ class SkillExecutor:
             return "认证失败"
         if "timeout" in lower or isinstance(error, TimeoutError):
             return "调用超时"
+        if "graphrecursion" in lower or "recursion limit" in lower:
+            return "ReAct 达到递归上限"
         return "调用失败"
 
     @staticmethod
@@ -299,13 +316,13 @@ class SkillExecutor:
                 self._apply_llm_candidate(candidate)
             try:
                 return await asyncio.wait_for(
-                    self._run_skill_single_shot(skill, args, candidate, provider),
+                    self._run_skill_via_agent(skill, args, candidate, provider),
                     timeout=LLM_TAB_TIMEOUT_SECONDS,
                 )
             except TimeoutError as e:
-                self._disabled_providers.add(provider)
                 last_error = e
                 logger.warning("LLM provider %s timed out for skill %s", provider, skill.name)
+                # 超时仅跳出当前 provider 尝试，不禁用（下次还可尝试）
                 break
             except Exception as e:
                 last_error = e
@@ -322,23 +339,17 @@ class SkillExecutor:
             raise RuntimeError(f"{self._classify_llm_error(last_error)}，已尝试：{self._candidate_names()}")
         raise RuntimeError(f"没有可用 LLM 候选，已尝试：{self._candidate_names()}")
 
-    async def _run_skill_single_shot(self, skill: SkillDef, args: dict,
-                                     candidate: dict | None, provider: str) -> str:
-        """单次 Skill 执行（含 Function Calling 或纯文本模式）。"""
+    async def _run_skill_via_agent(self, skill: SkillDef, args: dict,
+                                   candidate: dict | None, provider: str) -> str:
+        """通过 AgentManager 执行 Skill（替换旧版 _run_skill_single_shot）。
+
+        旧版直接调用 AsyncOpenAI → Skill 无法使用工具/子Skill/子Agent。
+        新版委托给 AgentManager.run_skill() → 完整的 LangGraph ReAct Agent 生命周期。
+        """
         import json as _json
-        from openai import AsyncOpenAI
+
         from DataCode.skill_parser import SkillParser
-
-        parser = SkillParser()
-        full_body = parser.resolve_vars(skill.body, args, skill_dir=skill.skill_dir)
-        body = self._extract_system_prompt(full_body)
-
-        files_text = args.get("files", "")
-        knowledge_text = args.get("knowledge", "")
-        if files_text:
-            body += f"\n\n【患者资料】\n{files_text}"
-        if knowledge_text:
-            body += f"\n\n【知识库参考】\n{knowledge_text}"
+        from DataCode.llm_callback import LLMCallTracker
 
         config = getattr(self._agent_manager, "_config", None)
         base_url = (candidate or {}).get("base_url") or (config.get("llm.base_url", "") if config else "")
@@ -346,92 +357,30 @@ class SkillExecutor:
         api_key = (candidate or {}).get("api_key") or (config.get("llm.api_key", "") if config else "")
         agent_name = f"skill:{skill.name}:{provider}"
 
-        # 尝试加载该 Skill 的 Function Schema
-        tool = None
-        schema_path = Path(self._skills_dir) / skill.name / "schema.json"
-        if schema_path.exists():
-            try:
-                tool = _json.loads(schema_path.read_text(encoding="utf-8"))
-            except Exception:
-                logger.exception("Failed to load schema for skill %s", skill.name)
+        # 解析 body 用于 tracker
+        parser = SkillParser()
+        body = parser.resolve_vars(skill.body, args, skill_dir=skill.skill_dir)
 
-        client = AsyncOpenAI(
-            api_key=api_key or "dummy",
-            base_url=base_url or None,
-            default_headers={"User-Agent": "curl/8.17.0"},
-        )
-
-        from DataCode.llm_callback import LLMCallTracker
         tracker = LLMCallTracker.instance()
         call_id = tracker.start(agent=agent_name, model=model, base_url=base_url,
                                 api_key=api_key, prompt=body, kind="chat")
 
         try:
-            if tool:
-                func_name = tool["function"]["name"]
-                tool_schema = _json.dumps(tool["function"]["parameters"], ensure_ascii=False)
-                is_flash = "flash" in model.lower()
-                if is_flash:
-                    system_msg = f"{body}\n\n你必须输出以下JSON结构，字段名不可改变：\n{tool_schema}"
-                    for attempt in range(2):
-                        response = await client.chat.completions.create(
-                            model=model,
-                            messages=[
-                                {"role": "system", "content": system_msg},
-                                {"role": "user", "content": "请输出JSON。"},
-                            ],
-                            response_format={"type": "json_object"},
-                            temperature=0.3 if attempt == 0 else 0.5,
-                        )
-                        content = response.choices[0].message.content or ""
-                        try:
-                            result = self._extract_json(str(content))
-                            _json.loads(result)
-                            tracker.succeed(call_id, content)
-                            return result
-                        except Exception:
-                            if attempt == 0:
-                                system_msg = f"{body}\n\n字段名不可改变，只输出纯JSON。\n{tool_schema}"
-                                continue
-                            tracker.succeed(call_id, content)
-                            return self._extract_json(str(content))
-                else:
-                    system_msg = f"{body}\n\n请调用 {func_name} 函数提交数据。"
-                    for attempt in range(2):
-                        response = await client.chat.completions.create(
-                            model=model,
-                            messages=[
-                                {"role": "system", "content": system_msg},
-                                {"role": "user", "content": f"请调用 {func_name} 函数提交数据。你必须调用此函数, 不要输出任何文本。"},
-                            ],
-                            tools=[tool],
-                            temperature=0.4,
-                        )
-                        msg = response.choices[0].message
-                        if msg.tool_calls and len(msg.tool_calls) > 0:
-                            args_str = msg.tool_calls[0].function.arguments
-                            tracker.succeed(call_id, args_str)
-                            return args_str
-                        if attempt == 0:
-                            system_msg = f"你必须只调用 {func_name} 函数, 绝不能输出文本。\n\n{body}"
-                            continue
-                        content = msg.content or ""
-                        tracker.succeed(call_id, content)
-                        return self._extract_json(str(content))
-            else:
-                # 无 Schema → 纯文本模式
-                response = await client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": body},
-                        {"role": "user", "content": args.get("message", "请开始执行。")},
-                    ],
-                    temperature=0.4,
+            # 委托给 AgentManager.run_skill() — Skill 将拥有完整的工具/子Agent 能力
+            # 限制递归轮次避免 ReAct Agent 无效循环（默认 25 → 15，减少约 40% LLM 调用）
+            raw_result = await self._agent_manager.run_skill(skill, args, recursion_limit=SKILL_RECURSION_LIMIT)
+
+            tracker.succeed(call_id, raw_result)
+
+            # 尝试解析为 JSON；若失败则包装为 JSON
+            try:
+                parsed = _json.loads(self._extract_json(str(raw_result)))
+                return _json.dumps(parsed, ensure_ascii=False)
+            except Exception:
+                return _json.dumps(
+                    {"step": skill.name, "result": str(raw_result)},
+                    ensure_ascii=False,
                 )
-                content = response.choices[0].message.content or ""
-                tracker.succeed(call_id, content)
-                # 包装为 JSON 以便后续统一处理
-                return _json.dumps({"step": skill.name, "result": content}, ensure_ascii=False)
         except Exception as e:
             tracker.fail(call_id, e)
             raise
@@ -495,20 +444,20 @@ class SkillExecutor:
 
     def _build_chat_prompt(self, patient_id: str, files: list[dict], message: str, history: list[dict]) -> list[dict]:
         sys_prompt = (
-            "你是一个 AI 辅助分析助手。请基于已读取的资料用简体中文给出专业、严谨的回答。"
-            "若信息不足请明确说明，不要捏造数据。"
+            "你是一个 AI 辅助分析助手。以下「已加载的患者资料」是系统已预读取的真实患者数据，"
+            "请直接基于这些资料用简体中文给出专业、严谨的回答。"
+            "若资料中确实缺乏某项信息请明确说明，不要捏造数据。"
         )
         summary = _file_category_summary(files)
-        snippet = _first_content_snippet(files, 600)
-        context_lines = [
-            f"数据编号: {patient_id}",
-            f"已读取资料: {summary}",
-            f"资料摘要: {snippet}",
-        ]
-        messages: list[dict] = [
-            {"role": "system", "content": sys_prompt},
-            {"role": "system", "content": "\n".join(context_lines)},
-        ]
+        files_preview = _format_files_for_prompt(files, total_budget=15000, per_file_budget=800)
+        data_block = (
+            f"患者编号: {patient_id}\n"
+            f"资料统计: {summary}\n\n"
+            f"--- 已加载的患者资料（共 {len(files)} 份）---\n\n"
+            f"{files_preview}"
+        )
+        messages: list[dict] = [{"role": "system", "content": sys_prompt}]
+        # 将文件内容放在 user 消息中而非 system prompt，确保模型将其视为对话上下文
         for entry in (history or [])[-8:]:
             role = entry.get("role")
             content = str(entry.get("content", "")).strip()
@@ -518,18 +467,19 @@ class SkillExecutor:
                 messages.append({"role": "user", "content": content})
             elif role == "assistant":
                 messages.append({"role": "assistant", "content": content})
-        messages.append({"role": "user", "content": message})
+        messages.append({"role": "user", "content": f"{data_block}\n\n用户问题: {message}"})
         return messages
 
     @staticmethod
     def _build_chat_fallback(patient_id: str, files: list[dict], message: str, reason: str) -> str:
         summary = _file_category_summary(files)
-        snippet = _first_content_snippet(files, 240)
+        files_preview = _format_files_for_prompt(files, total_budget=10000, per_file_budget=600)
         return (
-            f"【离线模式】当前未能调用大模型（{reason}），以下是基于已上传资料的本地摘要回答，仅供参考。\n\n"
-            f"- 数据: {patient_id}\n"
-            f"- 已读取: {summary}\n"
-            f"- 片段: {snippet}\n\n"
+            f"【离线模式】当前未能调用大模型（{reason}），以下是已加载的患者资料本地摘要，仅供参考。\n\n"
+            f"患者编号: {patient_id}\n"
+            f"资料统计: {summary}\n\n"
+            f"--- 已加载的患者资料（共 {len(files)} 份）---\n\n"
+            f"{files_preview}\n\n"
             f"针对问题「{message}」，建议结合原始数据进一步分析。"
         )
 
@@ -660,13 +610,21 @@ class SkillExecutor:
                         },
                     )
                     result_json = json.loads(result_text)
+                    # 始终注入原始 Markdown 文本，供前端 Tab 回退渲染
+                    result_json["_content"] = result_text
                 except TimeoutError:
                     fallback_note = f"LLM 调用超过 {LLM_TAB_TIMEOUT_SECONDS} 秒"
-                    llm_disabled_note = fallback_note
                     logger.warning("Step %s timed out", step.name)
                 except json.JSONDecodeError:
-                    fallback_note = "LLM 输出非有效 JSON"
-                    logger.exception("JSON decode failed for step %s", step.name)
+                    # JSON 解析失败时，将原始文本作为 markdown 内容保留
+                    fallback_note = "LLM 输出非有效 JSON（已保留原始文本）"
+                    result_json = {
+                        "step": step.name,
+                        "display_name": step.display_name,
+                        "content": result_text or "",
+                        "status": "markdown",
+                    }
+                    logger.warning("JSON decode failed for step %s, keeping raw markdown (len=%d)", step.name, len(result_text))
                 except Exception as e:
                     fallback_note = f"LLM {self._classify_llm_error(e)}"
                     llm_disabled_note = fallback_note
@@ -687,7 +645,11 @@ class SkillExecutor:
 
             pipeline_results[step.name] = result_json
             event_id += 1
-            yield {"id": event_id, "event": "tab_ready", "data": {"tab": step.name, "data": result_json}}
+
+            # 映射到前端 TabName：仅步骤 5-9 生成标签页
+            tab_name = _STEP_TO_TAB.get(step.name)
+            if tab_name:
+                yield {"id": event_id, "event": "tab_ready", "data": {"tab": tab_name, "data": result_json}}
             event_id += 1
             suffix = f"（{fallback_note}）" if fallback_note else ""
             yield {"id": event_id, "event": "token", "data": {"content": f"已完成{step.display_name}{suffix}\n"}}

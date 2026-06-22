@@ -11,6 +11,7 @@ import TabPrediction from './TabPrediction'
 import TabCare from './TabCare'
 import EditForm from './EditForm'
 import DownloadButton from './DownloadButton'
+import MarkdownRenderer from '../common/MarkdownRenderer'
 
 function EditIcon() {
   return (
@@ -58,12 +59,39 @@ export default function ReportPanel() {
     }
   }
 
+  /** 渲染 Tab 内容：优先结构化渲染，无结构化数据时回退到 Markdown */
+  function renderTabContent(
+    _tab: TabName,
+    StructuredComponent: React.ComponentType<{ data?: unknown }>,
+    data: unknown,
+  ): ReactNode {
+    if (!data) {
+      return <div className="empty-state">等待生成...</div>
+    }
+    const record = data as Record<string, unknown>
+    // 检查是否有原始 markdown 内容（_content / content 字段）
+    const rawContent = (record._content || record.content) as string | undefined
+    const hasStructured = Object.keys(record).filter(k => k !== '_content' && k !== 'content' && k !== 'step' && k !== 'display_name' && k !== 'status').length > 0
+
+    if (hasStructured) {
+      return <StructuredComponent data={record as never} />
+    }
+    if (rawContent) {
+      return (
+        <div className="report-tab-content">
+          <MarkdownRenderer content={rawContent} />
+        </div>
+      )
+    }
+    return <div className="empty-state">无内容</div>
+  }
+
   const tabContent: Record<TabName, ReactNode> = {
-    'patient-history': <TabHistory data={tabs['patient-history']} />,
-    'patient-overview': <TabOverview data={tabs['patient-overview']} />,
-    'treatment-plan': <TabTreatment data={tabs['treatment-plan']} />,
-    'efficacy-prediction': <TabPrediction data={tabs['efficacy-prediction']} />,
-    'suggestions': <TabCare data={tabs.suggestions} />,
+    'patient-history': renderTabContent('patient-history', TabHistory, tabs['patient-history']),
+    'patient-overview': renderTabContent('patient-overview', TabOverview, tabs['patient-overview']),
+    'treatment-plan': renderTabContent('treatment-plan', TabTreatment, tabs['treatment-plan']),
+    'efficacy-prediction': renderTabContent('efficacy-prediction', TabPrediction, tabs['efficacy-prediction']),
+    'suggestions': renderTabContent('suggestions', TabCare, tabs.suggestions),
   }
 
   const handleGenerate = async () => {

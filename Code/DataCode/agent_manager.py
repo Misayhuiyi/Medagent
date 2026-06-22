@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import logging
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 from DataCode.deep_agent import create_deep_agent
@@ -11,6 +14,42 @@ if TYPE_CHECKING:
     from DataCode.memory_store import MemoryStore
     from DataCode.skill_parser import SkillDef
     from DataCode.tool_registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
+
+
+def resolve_sub_skill_path(parent_skill_dir: str, ref_path: str,
+                           skills_base_dir: str | None = None) -> str:
+    """解析子 Skill 引用路径。
+
+    支持两种引用模式：
+    - 相对路径：skills/xxx/SKILL.md → 在 parent_skill_dir 下查找
+    - 跨目录引用：../_shared/xxx/SKILL.md → 在 parent_skill_dir 父目录下查找
+    若上述均未命中，回退到全局 skills_base_dir 搜索。
+
+    Args:
+        parent_skill_dir: 主 Skill 所在目录的绝对路径
+        ref_path: 子 Skill 的引用路径（来自 SKILL.md body）
+        skills_base_dir: 全局 skills 根目录路径（可选回退）
+
+    Returns:
+        子 Skill SKILL.md 的绝对路径
+
+    Raises:
+        FileNotFoundError: 路径不存在时抛出
+    """
+    parent = Path(parent_skill_dir)
+    # 直接拼接处理相对路径和 ../ 跨目录引用
+    candidate = (parent / ref_path).resolve()
+    if candidate.exists():
+        return str(candidate)
+    # 回退：从全局 skills 目录搜索
+    if skills_base_dir:
+        candidate = (Path(skills_base_dir) / ref_path).resolve()
+        if candidate.exists():
+            return str(candidate)
+    raise FileNotFoundError(
+        f"Sub-skill not found: {ref_path} (resolved from {parent_skill_dir})")
 
 
 class AgentManager:
@@ -98,12 +137,22 @@ class AgentManager:
         )
         self._agents[name] = {"agent": agent, "config": None, "status": "active"}
 
-    async def run_skill(self, skill: SkillDef, args: dict | None = None) -> str:
+    async def run_skill(self, skill: SkillDef, args: dict | None = None,
+                        recursion_limit: int = 25) -> str:
         """执行指定 Skill。创建临时 Agent，执行后自动销毁。"""
         from DataCode.skill_parser import SkillParser
 
         parser = SkillParser()
         body = parser.resolve_vars(skill.body, args, skill_dir=skill.skill_dir)
+
+        # 将患者资料和知识库上下文注入到系统 prompt（$ARGUMENTS 仅做变量替换，
+        # 大文本内容需要直接注入，避免丢失）
+        files_text = (args or {}).get("files", "")
+        knowledge_text = (args or {}).get("knowledge", "")
+        if files_text:
+            body += f"\n\n【患者资料】\n{files_text}"
+        if knowledge_text:
+            body += f"\n\n【知识库参考】\n{knowledge_text}"
 
         tools = self._assemble_tools_for_skill(skill)
         agent_name = f"skill:{skill.name}"
@@ -120,9 +169,18 @@ class AgentManager:
             parallel_tool_calls=self._parallel_tool_calls,
         )
 
-        input_text = "\n".join(f"{k}: {v}" for k, v in (args or {}).items()) if args else "开始执行"
+        # 用户消息排除已注入系统 prompt 的大文本字段，避免双倍 token
+        user_args = {k: v for k, v in (args or {}).items() if k not in ("files", "knowledge")}
+        input_text = "\n".join(f"{k}: {v}" for k, v in user_args.items()) if user_args else "请按上述步骤执行并输出结果。"
         from langchain_core.messages import HumanMessage
-        result = await agent.ainvoke({"messages": [HumanMessage(content=input_text)]})
+        import asyncio
+        result = await asyncio.wait_for(
+            agent.ainvoke(
+                {"messages": [HumanMessage(content=input_text)]},
+                config={"recursion_limit": recursion_limit},
+            ),
+            timeout=165,  # 略小于 pipeline step 的 180s 超时
+        )
 
         messages = result.get("messages", [])
 
@@ -150,6 +208,59 @@ class AgentManager:
         result = await self.run_skill(skill, args)
         self._agents.pop(name, None)
         return result
+
+    async def spawn_sub_agent_isolated(self, name: str, skill: SkillDef,
+                                       args: dict | None = None,
+                                       context: dict | None = None) -> str:
+        """创建隔离子 Agent 执行 Skill。
+
+        与 run_skill 的区别：
+        - 注入独立上下文 context（如 patient_id、visit_date、previous_results 等），
+          以 JSON 格式嵌入 System Prompt，不共享主 Agent 会话状态。
+        - 适用于 SKILL.md 中「创建子Agent（sessions_spawn，context="isolated"）」
+          的语义。
+        - 执行完成后自动销毁。
+
+        Args:
+            name: 子 Agent 名称（建议与子 Skill 名一致）
+            skill: 已解析的 SkillDef
+            args: 变量替换参数（同 run_skill）
+            context: 隔离子上下文 dict
+
+        Returns:
+            Agent 最终输出的消息文本
+        """
+        from DataCode.skill_parser import SkillParser
+
+        parser = SkillParser()
+        body = parser.resolve_vars(skill.body, args, skill_dir=skill.skill_dir)
+
+        if context:
+            serialized = json.dumps(context, ensure_ascii=False, indent=2)
+            body += f"\n\n【当前步骤上下文 - 仅用于本次执行】\n```json\n{serialized}\n```"
+
+        tools = self._assemble_tools_for_skill(skill)
+        agent_name = f"sub:{name}"
+
+        agent = create_deep_agent(
+            model=skill.model or self._config.get("llm.default_model", ""),
+            system_prompt=body,
+            tools=tools,
+            base_url=self._config.get("llm.base_url", ""),
+            api_key=self._config.get("llm.api_key", ""),
+            mode=skill.mode,
+            logger=self._logger,
+            agent_name=agent_name,
+            parallel_tool_calls=self._parallel_tool_calls,
+        )
+
+        input_text = (args or {}).get("message", "请按上述步骤执行并输出结果。")
+        from langchain_core.messages import HumanMessage
+        result = await agent.ainvoke({"messages": [HumanMessage(content=input_text)]})
+
+        messages = result.get("messages", [])
+        self._agents.pop(agent_name, None)
+        return messages[-1].content if messages else ""
 
     async def schedule_sub_agents(self, tasks: list[tuple[str, SkillDef, dict | None]]) -> list[str]:
         """调度多个子 Agent 任务（串行执行）。"""

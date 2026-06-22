@@ -13,6 +13,8 @@ export function useChat(patientId: string | null) {
   const setStreaming = useChatStore((s) => s.setStreaming)
   const setLastEventId = useChatStore((s) => s.setLastEventId)
   const setTabData = useReportStore((s) => s.setTabData)
+  const setActiveTab = useReportStore((s) => s.setActiveTab)
+  const appendTabContent = useReportStore((s) => s.appendTabContent)
 
   const abort = useCallback(() => {
     abortRef.current?.abort()
@@ -118,6 +120,15 @@ export function useChat(patientId: string | null) {
       case 'tab_ready': {
         const tab = event.data.tab as TabName
         setTabData(tab, event.data.data)
+        // 报告模式自动切换到刚完成的标签页
+        if (modeRef.current === 'report') {
+          setActiveTab(tab)
+        }
+        break
+      }
+      case 'tab_content': {
+        const tab = event.data.tab as TabName
+        appendTabContent(tab, event.data.content || '')
         break
       }
       case 'error':
@@ -129,6 +140,14 @@ export function useChat(patientId: string | null) {
         break
       case 'done':
         setStreaming(false)
+        // 报告模式：done 后追加完成消息提示
+        if (modeRef.current === 'report') {
+          addMessage({
+            role: 'assistant',
+            content: '报告已生成，可在右侧标签页查看或点击「下载报告」导出。',
+            timestamp: new Date().toISOString(),
+          } as any)
+        }
         break
     }
   }
