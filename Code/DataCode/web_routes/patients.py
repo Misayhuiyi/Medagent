@@ -179,7 +179,7 @@ async def upload_patient_files(
     # Determine patient_id from first file's webkitRelativePath or use provided
     first_name = files[0].filename or ""
     if not patient_id:
-        # Try to extract from path like "张三-001/影像报告/A1.pdf"
+        # Try to extract from path like "patient-001/category/file.pdf"
         parts = first_name.replace("\\", "/").split("/")
         patient_id = parts[0] if len(parts) > 1 else f"upload-{int(datetime.now().timestamp())}"
 

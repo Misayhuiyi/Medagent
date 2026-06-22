@@ -105,17 +105,24 @@ class RagKnowledgeBase:
 
     @staticmethod
     def _map_evidence(source: str) -> int:
+        """根据来源名称映射证据等级（通过 platform.yaml 中 evidence_mapping 配置驱动）。
+        若未配置，默认返回 EXPERT_OPINION。
+        """
         s = source.upper()
-        if "NCCN" in s:
-            return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
-        if "ASCO" in s:
-            return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
-        if "ESMO" in s:
-            return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
-        if "CSCO" in s:
-            return EvidenceLevel.NATIONAL_GUIDELINE[0]
-        if s in ("SITC", "CTCAE"):
-            return EvidenceLevel.INTERNATIONAL_CONSENSUS[0]
+        # 从平台配置读取证据映射（可从 config_manager 注入），未配置时回退
+        try:
+            from DataCode.config_manager import ConfigManager
+            mapping = ConfigManager._global_config.get("evidence_mapping") if hasattr(ConfigManager, "_global_config") else None
+        except Exception:
+            mapping = None
+        if mapping:
+            label = mapping.get(s)
+            if label == "international_guideline":
+                return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
+            if label == "national_guideline":
+                return EvidenceLevel.NATIONAL_GUIDELINE[0]
+            if label == "international_consensus":
+                return EvidenceLevel.INTERNATIONAL_CONSENSUS[0]
         return EvidenceLevel.EXPERT_OPINION[0]
 
 

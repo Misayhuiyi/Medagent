@@ -2,8 +2,8 @@
 
 包装 AgentManager + SkillParser + KnowledgeBase，
 支持两种模式：
-  - Tab 模式：并行执行多个独立 Skill（默认 5 个报告页签）
-  - Pipeline 模式：串行执行流水线步骤（肺癌医生 10 步流程）
+  - Tab 模式：并行执行多个独立 Skill（按配置生成标签页）
+  - Pipeline 模式：串行执行流水线步骤（按 pipeline.yaml 驱动）
 
 所有业务逻辑（步骤名称、顺序、输出 Schema）均由 skills/pipeline.yaml + 各步骤
 目录下的 schema.json 控制，引擎层不做硬编码。
@@ -98,21 +98,20 @@ def _score_result_for_step(result: dict, keywords: list[str]) -> int:
 # ═══════════════════════════════════════════════════════════════
 
 def _file_category_summary(files: list[dict]) -> str:
-    """统计患者资料分类摘要。"""
-    counts = {"影像报告": 0, "检验报告": 0, "病历": 0, "病理报告": 0, "其他资料": 0}
+    """统计患者资料分类摘要（按文件所在目录自动归类，不假定业务分类体系）。"""
+    counts: dict[str, int] = {}
     for file in files:
         name = str(file.get("name", ""))
-        if "影像" in name:
-            counts["影像报告"] += 1
-        elif "检验" in name:
-            counts["检验报告"] += 1
-        elif "病理" in name:
-            counts["病理报告"] += 1
-        elif any(kw in name for kw in ("病历", "入院", "出院", "门诊")):
-            counts["病历"] += 1
+        # 自动从文件路径提取父目录作为类别
+        parts = name.replace("\\", "/").split("/")
+        if len(parts) >= 2:
+            category = parts[-2]
         else:
-            counts["其他资料"] += 1
-    return "、".join(f"{key}{value}份" for key, value in counts.items() if value) or "暂无可解析文件"
+            category = "资料"
+        counts[category] = counts.get(category, 0) + 1
+    if not counts:
+        return "暂无可解析文件"
+    return "、".join(f"{key}{value}份" for key, value in counts.items())
 
 
 def _first_content_snippet(files: list[dict], limit: int = 160) -> str:
