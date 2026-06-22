@@ -138,7 +138,7 @@ def _init_skill_executor(project_root: str) -> None:
     import secrets
     session_id = f"{datetime.now().strftime('%Y-%m-%d_%H%M%S')}_{secrets.token_hex(3)}"
     memory = MemoryStore(
-        long_term_path=str(root / "memory"),
+        long_term_path=str(root / "Data" / "memory"),
         session_id=session_id,
     )
     registry.register(create_save_memory_tool(memory))
@@ -164,9 +164,9 @@ def _init_skill_executor(project_root: str) -> None:
 
 
 def create_app(
-    patients_dir: str = "tempdata/patients",
-    skills_dir: str = "data/skills",
-    knowledge_dir: str = "data/knowledge_base",
+    patients_dir: str = "TempData/patients",
+    skills_dir: str = "Data/skills",
+    knowledge_dir: str = "Data/knowledge_base",
     reports_dir: str = "Result",
     memory_dir: str = "memory",
     project_root: str | None = None,

@@ -3,7 +3,7 @@ from pathlib import Path
 from DataCode.tool_registry import ToolDef
 
 
-READ_ALLOWED = ["tempdata/", "Result/", "data/skills/", "data/agents/", "memory/", "data/"]
+READ_ALLOWED = ["TempData/", "Result/", "Data/skills/", "Data/agents/", "Data/memory/", "Data/"]
 WRITE_ALLOWED = ["Result/"]
 
 MAX_READ_SIZE = 10 * 1024 * 1024   # 10 MB

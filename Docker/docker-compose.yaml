@@ -7,9 +7,9 @@ services:
       context: ..
       dockerfile: Docker/Dockerfile
     volumes:
-      - ${NAS_PATH:-./user_data}:/app/tempdata/patients:ro
+      - ${NAS_PATH:-./user_data}:/app/TempData/patients:ro
       - ${RESULT_PATH:-./results}:/app/Result:rw
-      - ./data:/app/data:ro
+      - ./Data:/app/Data:ro
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

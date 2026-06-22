@@ -1,6 +1,11 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
 [project]
-name = "agent-template"
+name = "medagent"
 version = "0.1.0"
+description = "可复用的多 Agent 协作平台框架"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

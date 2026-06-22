@@ -20,7 +20,7 @@ a2a:
 
 memory:
   max_short_term: 50
-  long_term_path: "TempData/memory/long_term"
+  long_term_path: "Data/memory/long_term"
 
 context:
   summary_threshold: 0.7

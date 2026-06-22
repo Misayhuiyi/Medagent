@@ -7,7 +7,7 @@
 
 模式说明:
   - web:   启动 FastAPI 服务（端口 8000），前端交互
-  - cli:   命令行执行，读取 tempdata/params.txt 参数，按 data/skills/pipeline.yaml 串行执行
+  - cli:   命令行执行，读取 TempData/params.txt 参数，按 Data/skills/pipeline.yaml 串行执行
   - blank: 验证框架可启动、能加载 Skill、前后端通信正常（最小验证）
 
 符合佰茵云规范：
@@ -57,7 +57,7 @@ def _load_env() -> None:
 
 
 def _load_params() -> dict[str, str]:
-    """从 tempdata/params.txt（两行格式）加载参数。
+    """从 TempData/params.txt（两行格式）加载参数。
 
     格式示例（第一行参数名，第二行参数值）:
         model
@@ -148,7 +148,7 @@ def _init_web_app():
     from DataCode.knowledge_base import RagKnowledgeBase
     from DataCode.skill_executor import SkillExecutor
 
-    config = ConfigManager(str(root / "data" / "platform.yaml"), str(root / "data" / "agents"))
+    config = ConfigManager(str(root / "Data" / "platform.yaml"), str(root / "Data" / "agents"))
     config.load()
 
     llm = config._platform.setdefault("llm", {})
@@ -168,7 +168,7 @@ def _init_web_app():
     registry.register(create_write_file_tool(str(root)))
 
     session_id = f"{datetime.now().strftime('%Y-%m-%d_%H%M%S')}_{secrets.token_hex(3)}"
-    memory = MemoryStore(long_term_path=str(root / "memory"), session_id=session_id)
+    memory = MemoryStore(long_term_path=str(root / "Data" / "memory"), session_id=session_id)
     registry.register(create_save_memory_tool(memory))
     registry.register(create_read_memory_tool(memory))
 
@@ -177,12 +177,12 @@ def _init_web_app():
 
     manager = AgentManager(config=config, registry=registry, memory=memory)
 
-    kb = RagKnowledgeBase(str(root / "data" / "knowledge_base"))
+    kb = RagKnowledgeBase(str(root / "Data" / "knowledge_base"))
     executor = SkillExecutor(agent_manager=manager, knowledge_base=kb, llm_candidates=llm_candidates)
-    loaded = executor.load_skills(str(root / "data" / "skills"))
+    loaded = executor.load_skills(str(root / "Data" / "skills"))
     logger.info("Loaded skills: %s", loaded)
 
-    executor.load_pipeline(str(root / "data" / "skills" / "pipeline.yaml"))
+    executor.load_pipeline(str(root / "Data" / "skills" / "pipeline.yaml"))
     logger.info("Pipeline steps: %s", [s.name for s in executor.pipeline_steps])
 
     _app_state["skill_executor"] = executor
@@ -190,11 +190,11 @@ def _init_web_app():
     _app_state["knowledge_base"] = kb
 
     return create_app(
-        patients_dir=str(root / "tempdata" / "patients"),
-        skills_dir=str(root / "data" / "skills"),
-        knowledge_dir=str(root / "data" / "knowledge_base"),
+        patients_dir=str(root / "TempData" / "patients"),
+        skills_dir=str(root / "Data" / "skills"),
+        knowledge_dir=str(root / "Data" / "knowledge_base"),
         reports_dir=str(root / "Result"),
-        memory_dir=str(root / "memory"),
+        memory_dir=str(root / "Data" / "memory"),
         project_root=str(root),
     )
 
@@ -232,8 +232,8 @@ async def _run_cli() -> None:
     root = Path(PROJECT_ROOT)
 
     # 检查配置
-    config_path = root / "data" / "platform.yaml"
-    agents_path = root / "data" / "agents"
+    config_path = root / "Data" / "platform.yaml"
+    agents_path = root / "Data" / "agents"
     if not config_path.exists():
         print(f"Error: 缺少 {config_path}", file=sys.stderr)
         sys.exit(1)
@@ -264,7 +264,7 @@ async def _run_cli() -> None:
     log_dir = result_dir / "logs"
     logger_obj = ExecutionLogger(str(result_dir), str(log_dir), session_id)
 
-    memory = MemoryStore(long_term_path=str(root / "memory"), session_id=session_id)
+    memory = MemoryStore(long_term_path=str(root / "Data" / "memory"), session_id=session_id)
     registry.register(create_save_memory_tool(memory))
     registry.register(create_read_memory_tool(memory))
 
@@ -273,10 +273,10 @@ async def _run_cli() -> None:
 
     manager = AgentManager(config=config, registry=registry, memory=memory)
 
-    kb = RagKnowledgeBase(str(root / "data" / "knowledge_base"))
+    kb = RagKnowledgeBase(str(root / "Data" / "knowledge_base"))
     executor = SkillExecutor(agent_manager=manager, knowledge_base=kb, llm_candidates=llm_candidates)
 
-    skills_dir = root / "data" / "skills"
+    skills_dir = root / "Data" / "skills"
     loaded = executor.load_skills(str(skills_dir))
     print(f"Skills loaded: {loaded}")
 
@@ -331,16 +331,16 @@ def _run_blank() -> None:
     checks.append((".env", env_exists, str(root / ".env")))
 
     # 2. 检查 platform.yaml
-    plat_exists = (root / "data" / "platform.yaml").exists()
-    checks.append(("platform.yaml", plat_exists, str(root / "data" / "platform.yaml")))
+    plat_exists = (root / "Data" / "platform.yaml").exists()
+    checks.append(("Data/platform.yaml", plat_exists, str(root / "Data" / "platform.yaml")))
 
     # 3. 检查 agents 配置
-    agents_exists = (root / "data" / "agents" / "main").exists()
-    checks.append(("agents/main/", agents_exists, str(root / "data" / "agents" / "main")))
+    agents_exists = (root / "Data" / "agents" / "main").exists()
+    checks.append(("Data/agents/main/", agents_exists, str(root / "Data" / "agents" / "main")))
 
     # 4. 检查 pipeline.yaml
-    pipeline_exists = (root / "data" / "skills" / "pipeline.yaml").exists()
-    checks.append(("pipeline.yaml", pipeline_exists, str(root / "data" / "skills" / "pipeline.yaml")))
+    pipeline_exists = (root / "Data" / "skills" / "pipeline.yaml").exists()
+    checks.append(("Data/skills/pipeline.yaml", pipeline_exists, str(root / "Data" / "skills" / "pipeline.yaml")))
 
     # 5. 检查 DataCode 模块
     datacode_dir = root / "Code" / "DataCode"
@@ -351,15 +351,15 @@ def _run_blank() -> None:
     frontend_exists = (root / "frontend" / "package.json").exists()
     checks.append(("frontend/", frontend_exists, str(root / "frontend")))
 
-    # 7. 检查 tempdata/ 目录
-    tempdata_exists = (root / "tempdata").exists()
-    checks.append(("tempdata/", tempdata_exists, str(root / "tempdata")))
+    # 7. 检查 TempData/ 目录
+    tempdata_exists = (root / "TempData").exists()
+    checks.append(("TempData/", tempdata_exists, str(root / "TempData")))
 
     # 8. 尝试加载 Skill
     try:
         from DataCode.skill_parser import SkillParser
         parser = SkillParser()
-        skills = parser.parse_dir(root / "data" / "skills")
+        skills = parser.parse_dir(root / "Data" / "skills")
         checks.append(("SkillParser", True, f"解析到 {len(skills)} 个 Skill"))
     except Exception as e:
         checks.append(("SkillParser", False, str(e)))
@@ -402,7 +402,7 @@ def main():
     if mode not in ("web", "cli", "blank"):
         print("用法: python Code/main.py <mode>")
         print("  web     启动 FastAPI Web 服务（前端交互）")
-        print("  cli     CLI 流水线模式（读 tempdata/params.txt）")
+        print("  cli     CLI 流水线模式（读 TempData/params.txt）")
         print("  blank   空白验证模式（检查目录/模块是否就绪）")
         sys.exit(1)
 

@@ -1,5 +1,5 @@
 # MedAgent Python 依赖
-# 安装：pip install -r data/requirements.txt
+# 安装：pip install -r Data/requirements.txt
 # 注意：此文件仅供参考，正式安装请用 pip install -e ".[dev]"
 
 fastapi>=0.115

@@ -9,11 +9,11 @@ RUN pip install --no-cache-dir -e ".[dev]"
 
 # 复制应用代码
 COPY Code/ ./Code/
-COPY data/ ./data/
-COPY tempdata/ ./tempdata/
+COPY Data/ ./Data/
+COPY TempData/ ./TempData/
 
 # 创建必要目录
-RUN mkdir -p /app/Result /app/memory
+RUN mkdir -p /app/Result /app/Data/memory /app/Data/knowledge_base
 
 # 环境变量
 ENV ANTHROPIC_API_KEY=""
