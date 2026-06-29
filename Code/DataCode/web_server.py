@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from DataCode._shared import load_env, build_llm_candidates
 from DataCode.log_setup import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -20,82 +21,13 @@ _app_state: dict = {}
 
 
 def _load_env_file(project_root: str) -> None:
-    env_path = Path(project_root) / ".env"
-    if not env_path.exists():
-        return
-    for raw_line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        lower_value = value.lower()
-        if not key or not value or "xxx" in lower_value or "your-api-key" in lower_value:
-            continue
-        os.environ.setdefault(key, value)
+    """加载 .env 环境变量（委派到共享模块）。"""
+    load_env(project_root)
 
 
 def _build_llm_candidates(config) -> list[dict]:
-    def valid_env(name: str) -> str:
-        value = os.environ.get(name, "").strip()
-        lower_value = value.lower()
-        if not value or "xxx" in lower_value or "your-api-key" in lower_value:
-            return ""
-        return value
-
-    llm = config._platform.setdefault("llm", {})
-    platform_base_url = str(llm.get("base_url", "") or "").strip()
-    platform_model = str(llm.get("default_model", "") or "").strip()
-    candidates = []
-
-    def add_candidate(name: str, api_key: str, base_url: str, model: str) -> None:
-        if not api_key or not base_url or not model:
-            return
-        signature = (name, base_url, model)
-        if any((item["name"], item["base_url"], item["model"]) == signature for item in candidates):
-            return
-        candidates.append({"name": name, "api_key": api_key, "base_url": base_url, "model": model})
-
-    def add_provider(provider: str, api_key: str, public_host: str,
-                     public_base_url: str, public_model: str) -> None:
-        """为某供应商的 key 生成候选。
-
-        关键约束：一个 key 只应指向它真正归属的 endpoint。
-        - 若平台 base_url 已配置且不是该供应商的公网域名，则把该 key 作为
-          “平台网关候选”(PLATFORM_*)，因为平台 base_url（如 opencode.ai 网关）
-          可能就是这个 key 的真实归属地。
-        - 仅当用户显式提供了该供应商的 *_BASE_URL（说明确实要直连公网 endpoint），
-          或根本没有平台网关候选时，才追加公网 endpoint 候选。
-          否则用同一个网关 key 去请求公网官方域名必然 401，纯属噪声。
-        """
-        explicit_base = valid_env(f"{provider}_BASE_URL")
-        explicit_model = valid_env(f"{provider}_MODEL")
-        platform_candidate_added = bool(platform_base_url and public_host not in platform_base_url)
-        if platform_candidate_added:
-            add_candidate(f"PLATFORM_{provider}_KEY", api_key, platform_base_url, platform_model)
-        if explicit_base or not platform_candidate_added:
-            add_candidate(provider, api_key,
-                          explicit_base or public_base_url,
-                          explicit_model or public_model)
-
-    generic_key = valid_env("LLM_API_KEY")
-    if generic_key:
-        add_candidate("LLM_API_KEY", generic_key, valid_env("LLM_BASE_URL") or platform_base_url, valid_env("LLM_MODEL") or platform_model)
-    openai_key = valid_env("OPENAI_API_KEY")
-    if openai_key:
-        add_provider("OPENAI", openai_key, "openai.com", "https://api.openai.com/v1", "gpt-4o-mini")
-    dashscope_key = valid_env("DASHSCOPE_API_KEY")
-    if dashscope_key:
-        add_provider("DASHSCOPE", dashscope_key, "dashscope.aliyuncs.com", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus")
-    deepseek_key = valid_env("DEEPSEEK_API_KEY")
-    if deepseek_key:
-        add_provider("DEEPSEEK", deepseek_key, "api.deepseek.com", "https://api.deepseek.com/v1", "deepseek-v4-flash")
-
-    preferred = valid_env("LLM_PROVIDER").upper()
-    if preferred:
-        candidates.sort(key=lambda item: 0 if item["name"].upper() == preferred else 1)
-    return candidates
+    """构建 LLM 候选列表（委派到共享模块）。"""
+    return build_llm_candidates(config)
 
 
 def _init_skill_executor(project_root: str) -> None:
@@ -105,7 +37,7 @@ def _init_skill_executor(project_root: str) -> None:
     from DataCode.builtin_tools import (
         create_read_file_tool, create_write_file_tool,
         create_save_memory_tool, create_read_memory_tool,
-        create_todo_tool,
+        create_todo_tool, create_batch_pdf_conversion_tool,
     )
     from DataCode.todo_manager import TodoManager
     from DataCode.memory_store import MemoryStore
@@ -114,7 +46,7 @@ def _init_skill_executor(project_root: str) -> None:
     from DataCode.skill_executor import SkillExecutor
 
     root = Path(project_root)
-    config = ConfigManager(str(root / "data" / "platform.yaml"), str(root / "data" / "agents"))
+    config = ConfigManager(str(root / "Data" / "platform.yaml"), str(root / "Data" / "agents"))
     config.load()
 
     # 支持多种 API Key 环境变量名，并按常见供应商自动补齐 base_url/model
@@ -146,26 +78,57 @@ def _init_skill_executor(project_root: str) -> None:
 
     todo_mgr = TodoManager()
     registry.register(create_todo_tool(todo_mgr))
+    registry.register(create_batch_pdf_conversion_tool(project_root))
 
     manager = AgentManager(config=config, registry=registry, memory=memory)
 
-    kb = RagKnowledgeBase(str(root / "data" / "knowledge_base"))
+    # 上下文管理：监控 token 用量，防止 ReAct Agent 递归中消息膨胀
+    from DataCode.context_manager import ContextManager
+
+    def _count_tokens(messages: list) -> int:
+        """混合中英文 token 估算：中文 ~0.5 token/字，英文 ~0.25 token/字。"""
+        total = 0
+        for m in messages:
+            text = ""
+            if hasattr(m, "content"):
+                text = str(m.content)
+            elif isinstance(m, dict):
+                text = str(m.get("content", ""))
+            # 粗略估算：英文/数字/符号 ≈ 0.25 token/char，中文 ≈ 0.5 token/char
+            cn = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
+            en = len(text) - cn
+            total += int(cn * 0.5 + en * 0.25)
+        return total
+
+    context_mgr = ContextManager.from_config(config, _count_tokens)
+    manager._context_manager = context_mgr
+
+    kb = RagKnowledgeBase(str(root / "Data" / "knowledge_base"))
 
     # 注册 RAG 查询工具（Agent 可通过此工具检索知识库）
     from DataCode.builtin_tools import create_rag_query_tool
     registry.register(create_rag_query_tool(kb))
 
     executor = SkillExecutor(agent_manager=manager, knowledge_base=kb, llm_candidates=llm_candidates)
-    loaded = executor.load_skills(str(root / "data" / "skills"))
+    loaded = executor.load_skills(str(root / "Data" / "skills"))
     logger.info("Loaded skills: %s", loaded)
 
     # 加载流水线配置（从 data/skills/pipeline.yaml）
-    executor.load_pipeline(str(root / "data" / "skills" / "pipeline.yaml"))
+    executor.load_pipeline(str(root / "Data" / "skills" / "pipeline.yaml"))
     logger.info("Pipeline steps: %s", [s.name for s in executor.pipeline_steps])
 
     _app_state["skill_executor"] = executor
     _app_state["config"] = config
     _app_state["knowledge_base"] = kb
+
+    # 后台预热知识库和文本清洗器（避免首次调用 2-5s 延迟）
+    try:
+        import asyncio
+        asyncio.create_task(kb.warmup())
+        from DataCode.text_cleaner import TextCleaner
+        TextCleaner.warmup()
+    except Exception:
+        pass
 
 
 def create_app(
@@ -179,15 +142,17 @@ def create_app(
     """创建并配置 FastAPI 应用。"""
     app = FastAPI(title="MedAgent Demo", version="0.1.0")
 
-    # CORS：开发阶段允许所有来源。
+    # CORS：开发阶段允许所有来源。生产环境应通过 ALLOWED_ORIGINS 环境变量限制。
     # 注意：通配符来源 "*" 不能与 allow_credentials=True 同时使用——浏览器会拒绝
     # "Access-Control-Allow-Origin: *" 与凭证共存的响应。本服务前端与后端同源
     # （生产为静态挂载、开发走 Vite 代理），不依赖跨域 Cookie，因此关闭 credentials
     # 让通配符来源真正生效。
+    allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", "*")
+    allowed_origins = [o.strip() for o in allowed_origins_str.split(",") if o.strip()] if allowed_origins_str != "*" else ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
+        allow_origins=allowed_origins,
+        allow_credentials=allowed_origins != ["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -259,7 +224,9 @@ def create_app(
         pass
 
     # 同步初始化 SkillExecutor（不依赖 startup 事件，避免 --reload 进程隔离问题）
-    _init_skill_executor(project_root)
+    # 但如果外部（如 main.py）已初始化过，则跳过
+    if "skill_executor" not in _app_state:
+        _init_skill_executor(project_root)
 
     frontend_dist = Path(project_root) / "frontend_static"
     if not frontend_dist.exists():

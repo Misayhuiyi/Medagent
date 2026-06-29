@@ -5,7 +5,7 @@ llm:
   default_model: "deepseek-v4-flash"
   temperature: 0.7
   context_length: 200000
-  parallel_tool_calls: false
+  parallel_tool_calls: true
 
 workspace:
   root: "/workspace/user_data"

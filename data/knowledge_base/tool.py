@@ -43,7 +43,12 @@ def _load():
     collections = client.list_collections()
     if not collections:
         raise RuntimeError(f"No collections found in {_DB_PATH}")
-    _collection = collections[0]
+    # 优先选择 lung_cancer_guidelines 集合，否则选第一个
+    target_name = "lung_cancer_guidelines"
+    _collection = next((c for c in collections if c.name == target_name), collections[0])
+    if _collection.name != target_name and len(collections) > 1:
+        logger.warning("Multiple collections found, using '%s' (available: %s)",
+                       _collection.name, [c.name for c in collections])
     logger.info("ChromaDB loaded: %s (%s docs)", _collection.name, _collection.count())
 
 
@@ -82,7 +87,8 @@ def _extract_guideline_edition(source_file: str) -> str:
     # 截取合理长度作为版本标识
     if len(name) > 60:
         name = name[:57] + "..."
-    return name if year else f"{name} ({year})"
+    # 修复：有年份时拼接年份，无年份时返回文件名本身
+    return f"{name} ({year})" if year else name
 
 
 def search_guidelines(

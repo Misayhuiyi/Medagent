@@ -4,11 +4,54 @@ import FigmaReportCard from './FigmaReportCard'
 
 const TAB = 'patient-overview'
 
-function OverviewTextCard({ title, content, evidence }: { title: string; content: string; evidence: string }) {
-  if (!content) return null
+function safeText(v: unknown): string {
+  if (!v) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'object') {
+    const obj = v as Record<string, unknown>
+    if ('summary' in obj && typeof obj.summary === 'string') return obj.summary as string
+    if ('smoking' in obj || 'alcohol' in obj) {
+      const parts: string[] = []
+      if (obj.smoking && typeof obj.smoking === 'object') {
+        const s = obj.smoking as Record<string, unknown>
+        parts.push(`吸烟：${s.status || ''}${s.packYears ? ' (' + s.packYears + '包年)' : ''}`)
+      }
+      if (obj.alcohol && typeof obj.alcohol === 'object') {
+        const a = obj.alcohol as Record<string, unknown>
+        parts.push(`饮酒：${a.status || ''}`)
+      }
+      if (obj.occupationalExposure && Array.isArray(obj.occupationalExposure)) {
+        const items = obj.occupationalExposure.map((e: unknown) => {
+          if (typeof e === 'object' && e) {
+            const ee = e as Record<string, string>
+            return `${ee.exposure || ''}（${ee.detail || ''}）`
+          }
+          return String(e)
+        })
+        if (items.length) parts.push(`职业暴露：${items.join('；')}`)
+      }
+      return parts.filter(Boolean).join('\n')
+    }
+    if ('details' in obj && Array.isArray(obj.details)) {
+      return obj.details.map((d: unknown) => {
+        if (typeof d === 'object' && d) {
+          const dd = d as Record<string, string>
+          return `${dd.system || ''}：${dd.disease || ''}${dd.notes ? '（' + dd.notes + '）' : ''}`
+        }
+        return String(d)
+      }).filter(Boolean).join('\n')
+    }
+    return JSON.stringify(v, null, 2)
+  }
+  return String(v)
+}
+
+function OverviewTextCard({ title, content, evidence }: { title: string; content: unknown; evidence: string }) {
+  const text = safeText(content)
+  if (!text) return null
   return (
     <FigmaReportCard title={title} icon="overview" evidence={evidence} tab={TAB}>
-      <div className="figma-card__text">{content}</div>
+      <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
     </FigmaReportCard>
   )
 }
@@ -62,12 +105,13 @@ function LesionTable({ lesions }: { lesions: LesionItem[] }) {
   )
 }
 
-function EfficacyRow({ label, data }: { label: string; data: { response: string; change: string } }) {
+function EfficacyRow({ label, data }: { label: string; data?: { response?: string; change?: string } }) {
+  if (!data) return null
   return (
     <div className="efficacy-row">
       <span>{label}</span>
       <span>
-        <strong>{data.response}</strong> ({data.change})
+        <strong>{data.response || '未评估'}</strong>{data.change ? ` (${data.change})` : ''}
       </span>
     </div>
   )
@@ -84,12 +128,12 @@ export default function TabOverview({ data }: { data?: OverviewData }) {
         <FigmaReportCard title="辅助检查" icon="overview" evidence="证据来源：影像报告 + 检验报告" tab={TAB}>
           {data.auxiliary_examination.imaging && (
             <div className="figma-card__text report-text--subitem">
-              <strong>影像：</strong>{data.auxiliary_examination.imaging}
+              <strong>影像：</strong>{safeText(data.auxiliary_examination.imaging)}
             </div>
           )}
           {data.auxiliary_examination.lab_tests && (
             <div className="figma-card__text">
-              <strong>检验：</strong>{data.auxiliary_examination.lab_tests}
+              <strong>检验：</strong>{safeText(data.auxiliary_examination.lab_tests)}
             </div>
           )}
         </FigmaReportCard>
@@ -119,11 +163,11 @@ export default function TabOverview({ data }: { data?: OverviewData }) {
             const val = data.ai_adverse_events[key as 'symptoms' | 'signs' | 'imaging' | 'lab_tests']
             if (!val) return null
             const labels: Record<string, string> = { symptoms: '症状', signs: '体征', imaging: '影像', lab_tests: '检验' }
-            return <div key={key} className="figma-card__text"><strong>{labels[key]}：</strong>{val}</div>
+            return <div key={key} className="figma-card__text"><strong>{labels[key]}：</strong>{safeText(val)}</div>
           })}
           {data.ai_adverse_events.conclusion && (
             <div className="figma-card__text report-text--emphasis">
-              {data.ai_adverse_events.conclusion}
+              {safeText(data.ai_adverse_events.conclusion)}
             </div>
           )}
         </AssessmentCard>
@@ -133,17 +177,21 @@ export default function TabOverview({ data }: { data?: OverviewData }) {
 
       {data.ecog_score && (
         <AssessmentCard colorKey="other" title={`ECOG 评分 — ${data.ecog_score.score} 分`}>
-          <div className="figma-card__text">{data.ecog_score.description}</div>
+          <div className="figma-card__text">{safeText(data.ecog_score.description)}</div>
         </AssessmentCard>
       )}
 
       {data.diagnosis && (
         <FigmaReportCard title="诊断总结" icon="overview" evidence="证据来源：综合诊断 + 病理/基因/影像资料" tab={TAB}>
-          <div className="figma-card__text">
-            {data.diagnosis.tumor && <div><strong>肿瘤：</strong>{data.diagnosis.tumor}</div>}
-            {data.diagnosis.adverse_events && <div><strong>不良反应：</strong>{data.diagnosis.adverse_events}</div>}
-            {data.diagnosis.comorbidity && <div><strong>合并症：</strong>{data.diagnosis.comorbidity}</div>}
-          </div>
+          {data.diagnosis.tumor || data.diagnosis.adverse_events || data.diagnosis.comorbidity ? (
+            <div className="figma-card__text">
+              {data.diagnosis.tumor && <div><strong>肿瘤：</strong>{safeText(data.diagnosis.tumor)}</div>}
+              {data.diagnosis.adverse_events && <div><strong>不良反应：</strong>{safeText(data.diagnosis.adverse_events)}</div>}
+              {data.diagnosis.comorbidity && <div><strong>合并症：</strong>{safeText(data.diagnosis.comorbidity)}</div>}
+            </div>
+          ) : (
+            <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{safeText(data.diagnosis)}</div>
+          )}
         </FigmaReportCard>
       )}
     </div>

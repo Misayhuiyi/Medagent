@@ -31,6 +31,8 @@ PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+from DataCode._shared import load_env, build_llm_candidates
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,21 +41,8 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _load_env() -> None:
-    """加载 .env 环境变量。"""
-    env_path = Path(PROJECT_ROOT) / ".env"
-    if not env_path.exists():
-        return
-    for raw_line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        lower_value = value.lower()
-        if not key or not value or "xxx" in lower_value or "your-api-key" in lower_value:
-            continue
-        os.environ.setdefault(key, value)
+    """加载 .env 环境变量（委派到共享模块）。"""
+    load_env(PROJECT_ROOT)
 
 
 def _load_params() -> dict[str, str]:
@@ -86,44 +75,8 @@ def _load_params() -> dict[str, str]:
 
 
 def _build_llm_candidates(config) -> list[dict]:
-    """构建 LLM 候选列表（从 .env + platform.yaml）。"""
-    def valid_env(name: str) -> str:
-        value = os.environ.get(name, "").strip()
-        lower_value = value.lower()
-        if not value or "xxx" in lower_value or "your-api-key" in lower_value:
-            return ""
-        return value
-
-    llm = config._platform.setdefault("llm", {})
-    platform_base_url = str(llm.get("base_url", "") or "").strip()
-    platform_model = str(llm.get("default_model", "") or "").strip()
-    candidates: list[dict] = []
-
-    def add_candidate(name: str, api_key: str, base_url: str, model: str) -> None:
-        if not api_key or not base_url or not model:
-            return
-        candidates.append({"name": name, "api_key": api_key, "base_url": base_url, "model": model})
-
-    generic_key = valid_env("LLM_API_KEY")
-    if generic_key:
-        add_candidate("LLM_API_KEY", generic_key, valid_env("LLM_BASE_URL") or platform_base_url, valid_env("LLM_MODEL") or platform_model)
-
-    openai_key = valid_env("OPENAI_API_KEY")
-    if openai_key:
-        add_candidate("OPENAI", openai_key, "https://api.openai.com/v1", "gpt-4o-mini")
-
-    dashscope_key = valid_env("DASHSCOPE_API_KEY")
-    if dashscope_key:
-        add_candidate("DASHSCOPE", dashscope_key, "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus")
-
-    deepseek_key = valid_env("DEEPSEEK_API_KEY")
-    if deepseek_key:
-        add_candidate("DEEPSEEK", deepseek_key, "https://api.deepseek.com/v1", "deepseek-v4-flash")
-
-    preferred = valid_env("LLM_PROVIDER").upper()
-    if preferred:
-        candidates.sort(key=lambda item: 0 if item["name"].upper() == preferred else 1)
-    return candidates
+    """构建 LLM 候选列表（委派到共享模块）。"""
+    return build_llm_candidates(config)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

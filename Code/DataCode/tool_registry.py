@@ -37,9 +37,20 @@ class ToolDef:
     def to_langchain_tool(self):
         if self.handler is None:
             raise ValueError(f"Tool '{self.name}' has no handler, cannot convert to langchain tool")
+        import asyncio
         from langchain_core.tools import StructuredTool
 
         args_model = _json_schema_to_pydantic(self.parameters, f"{self.name}Args")
+        # 异步 handler 需要同时传入 func 和 coroutine，否则 LangGraph 的
+        # ainvoke 路径无法正确 await，coroutine 会被当作普通返回值。
+        if asyncio.iscoroutinefunction(self.handler):
+            return StructuredTool.from_function(
+                name=self.name,
+                description=self.description,
+                func=self.handler,
+                coroutine=self.handler,
+                args_schema=args_model,
+            )
         return StructuredTool.from_function(
             name=self.name,
             description=self.description,

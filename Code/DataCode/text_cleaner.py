@@ -70,6 +70,25 @@ class TextCleaner:
 
         return True
 
+    @classmethod
+    def warmup(cls) -> None:
+        """预热 TextCleaner：创建客户端的懒加载实例。
+        在后台任务中调用，不影响主流程。
+        """
+        try:
+            from openai import AsyncOpenAI
+            from DataCode.web_server import _app_state
+            config = _app_state.get("config")
+            if config:
+                _ = AsyncOpenAI(
+                    api_key=(config.get("llm.api_key", "") or "dummy"),
+                    base_url=(config.get("llm.base_url", "") or None),
+                    default_headers={"User-Agent": "curl/8.17.0"},
+                )
+                logger.info("TextCleaner warmup complete")
+        except Exception:
+            pass
+
     async def clean_batch(self, texts: list[str]) -> list[str]:
         """逐条清洗多段文本（后台并发，限流 MAX_CONCURRENT）。失败返回原文。"""
         if not texts:

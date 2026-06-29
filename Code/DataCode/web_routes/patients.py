@@ -47,21 +47,33 @@ async def list_patients():
         pdf_count = len(pdfs)
         import re
         date_pattern = re.compile(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})')
-        # 收集每个OCR文件的最早日期, 按日期排序后分组为就诊记录
+        _FILE_DATE_RE = re.compile(r'(\d{4})-(\d{2})-(\d{2})')
+        # 收集每个OCR文件的就诊日期，优先文件名日期，备用内容最早日期
         file_dates: list[str] = []
         for md_file in sorted(d.rglob("ocr/*.md")):
             try:
-                content = md_file.read_text(encoding="utf-8", errors="replace")[:2000]
-                earliest = None
-                for m in date_pattern.finditer(content):
-                    y, mo, dy = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
-                    y_int = int(y)
-                    if 2020 <= y_int <= 2030:
-                        d_str = f"{y}-{mo}-{dy}"
-                        if earliest is None or d_str < earliest:
-                            earliest = d_str
-                if earliest:
-                    file_dates.append(earliest)
+                # 1. 优先从文件名提取日期（如 2023-12-05_入院记录.md → 2023-12-05）
+                stem = md_file.stem  # "2023-12-05_入院记录"
+                file_date = None
+                for m in _FILE_DATE_RE.finditer(stem):
+                    y, mo, dy = m.group(1), m.group(2), m.group(3)
+                    if 2020 <= int(y) <= 2030:
+                        file_date = f"{y}-{mo}-{dy}"
+                        break
+                # 2. 文件名无日期时回退到内容
+                if not file_date:
+                    content = md_file.read_text(encoding="utf-8", errors="replace")[:2000]
+                    earliest = None
+                    for m in date_pattern.finditer(content):
+                        y, mo, dy = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
+                        y_int = int(y)
+                        if 2020 <= y_int <= 2030:
+                            d_str = f"{y}-{mo}-{dy}"
+                            if earliest is None or d_str < earliest:
+                                earliest = d_str
+                    file_date = earliest
+                if file_date:
+                    file_dates.append(file_date)
             except Exception:
                 continue
 

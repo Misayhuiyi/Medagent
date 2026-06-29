@@ -40,3 +40,12 @@ dist-ssr/
 
 # ── 临时数据（患者文件不上传版本库） ──
 tempdata/patients/
+
+# ── 知识库向量数据库（大文件，构建产物） ──
+data/knowledge_base/chroma_db/
+
+# ── 转换报告（运行产物） ──
+conversion_report.json
+
+# ── 辅助脚本 ──
+git_push.sh

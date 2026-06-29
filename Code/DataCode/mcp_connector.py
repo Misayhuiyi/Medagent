@@ -61,6 +61,15 @@ class MCPConnector:
 
         srv = self._servers[name]
         url = srv.get("url", "")
+
+        # 安全校验：只允许 https 和 http localhost 连接
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Unsupported MCP URL scheme: {parsed.scheme}")
+        if parsed.scheme == "http" and parsed.hostname not in ("localhost", "127.0.0.1", "::1"):
+            logger.warning("MCP server %s uses insecure HTTP (not localhost)", name)
+
         headers = srv.get("headers")
 
         from mcp.client.streamable_http import streamablehttp_client
@@ -112,6 +121,16 @@ class MCPConnector:
             return await self.call_tool(server_name, tool_name, kwargs)
 
         def _sync_handler(**kwargs):
+            # 不在 async 时使用 run_until_complete（已在事件循环中会崩溃）
+            # 改为委托给 load_tool 的 async 路径
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    return asyncio.run_coroutine_threadsafe(
+                        self.call_tool(server_name, tool_name, kwargs), loop
+                    ).result()
+            except RuntimeError:
+                pass  # 无运行中事件循环
             return asyncio.get_event_loop().run_until_complete(
                 self.call_tool(server_name, tool_name, kwargs)
             )

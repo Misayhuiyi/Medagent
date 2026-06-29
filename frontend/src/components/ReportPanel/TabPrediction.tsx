@@ -5,14 +5,16 @@ import FigmaReportCard from './FigmaReportCard'
 const TAB = 'efficacy-prediction'
 
 function PredictionChart({ data }: { data: { labels: string[]; series: { name: string; values: number[] }[] } }) {
-  if (!data?.labels?.length || !data?.series?.length) return null
-  const validSeries = data.series.filter(s => s.values?.length === data.labels.length)
+  const labels = Array.isArray(data?.labels) ? data.labels : []
+  const series = Array.isArray(data?.series) ? data.series : []
+  if (!labels.length || !series.length) return null
+  const validSeries = series.filter(s => Array.isArray(s.values) && s.values.length === labels.length)
   if (!validSeries.length) return null
   const option = {
     tooltip: { trigger: 'axis' as const },
     legend: { top: 0 },
     grid: { left: 40, right: 16, top: 30, bottom: 28 },
-    xAxis: { type: 'category' as const, data: data.labels, axisLabel: { fontSize: 11 } },
+    xAxis: { type: 'category' as const, data: labels, axisLabel: { fontSize: 11 } },
     yAxis: { type: 'value' as const, name: '毫米', axisLabel: { fontSize: 11 } },
     series: validSeries.map((s) => ({
       name: s.name,
@@ -26,8 +28,12 @@ function PredictionChart({ data }: { data: { labels: string[]; series: { name: s
 }
 
 function AdverseChart({ pred }: { pred: AdversePrediction }) {
-  if (!pred.labels?.length) return null
-  const allValues = [...(pred.grade1 || []), ...(pred.grade2 || []), ...(pred.grade3 || [])]
+  const labels = Array.isArray(pred.labels) ? pred.labels : []
+  const grade1 = Array.isArray(pred.grade1) ? pred.grade1 : []
+  const grade2 = Array.isArray(pred.grade2) ? pred.grade2 : []
+  const grade3 = Array.isArray(pred.grade3) ? pred.grade3 : []
+  if (!labels.length) return null
+  const allValues = [...grade1, ...grade2, ...grade3]
   const maxVal = Math.max(...allValues, 1)
   const yMax = maxVal > 1 ? Math.ceil(maxVal / 10) * 10 : 1
   const yName = maxVal > 1 ? '概率(%)' : '概率'
@@ -35,15 +41,15 @@ function AdverseChart({ pred }: { pred: AdversePrediction }) {
     tooltip: { trigger: 'axis' as const },
     legend: { top: 0, data: ['1级', '2级'] },
     grid: { left: 50, right: 16, top: 30, bottom: 28 },
-    xAxis: { type: 'category' as const, data: pred.labels, axisLabel: { fontSize: 11 } },
+    xAxis: { type: 'category' as const, data: labels, axisLabel: { fontSize: 11 } },
     yAxis: { type: 'value' as const, name: yName, min: 0, max: yMax, axisLabel: { fontSize: 11 } },
     series: [
       {
-        name: '1级', type: 'line' as const, data: pred.grade1,
+        name: '1级', type: 'line' as const, data: grade1,
         smooth: true, areaStyle: { opacity: 0.2 }, itemStyle: { color: '#ff9500' },
       },
       {
-        name: '2级', type: 'line' as const, data: pred.grade2,
+        name: '2级', type: 'line' as const, data: grade2,
         smooth: true, areaStyle: { opacity: 0.2 }, itemStyle: { color: '#ff3b30' },
       },
     ],
@@ -52,9 +58,12 @@ function AdverseChart({ pred }: { pred: AdversePrediction }) {
 }
 
 function SurvivalCurve({ data }: { data: { labels: string[]; pfs: number[]; os: number[] } }) {
-  if (!data?.labels?.length) return null
-  if (data.pfs.length !== data.labels.length || data.os.length !== data.labels.length) return null
-  const allValues = [...data.pfs, ...data.os]
+  const labels = Array.isArray(data?.labels) ? data.labels : []
+  const pfs = Array.isArray(data?.pfs) ? data.pfs : []
+  const os = Array.isArray(data?.os) ? data.os : []
+  if (!labels.length) return null
+  if (pfs.length !== labels.length || os.length !== labels.length) return null
+  const allValues = [...pfs, ...os]
   const maxVal = Math.max(...allValues, 1)
   const yMax = maxVal > 1 ? Math.ceil(maxVal / 10) * 10 : 1
   const yName = maxVal > 1 ? '率(%)' : '概率'
@@ -62,11 +71,11 @@ function SurvivalCurve({ data }: { data: { labels: string[]; pfs: number[]; os: 
     tooltip: { trigger: 'axis' as const },
     legend: { top: 0, data: ['无进展生存', '总生存'] },
     grid: { left: 60, right: 16, top: 30, bottom: 28 },
-    xAxis: { type: 'category' as const, data: data.labels, axisLabel: { fontSize: 11 } },
+    xAxis: { type: 'category' as const, data: labels, axisLabel: { fontSize: 11 } },
     yAxis: { type: 'value' as const, name: yName, min: 0, max: yMax, axisLabel: { fontSize: 11 } },
     series: [
-      { name: '无进展生存', type: 'line' as const, data: data.pfs, smooth: true, itemStyle: { color: '#0071e3' } },
-      { name: '总生存', type: 'line' as const, data: data.os, smooth: true, itemStyle: { color: '#34c759' } },
+      { name: '无进展生存', type: 'line' as const, data: pfs, smooth: true, itemStyle: { color: '#0071e3' } },
+      { name: '总生存', type: 'line' as const, data: os, smooth: true, itemStyle: { color: '#34c759' } },
     ],
   }
   return <ReactECharts option={option} className="report-chart report-chart--large" />
@@ -99,7 +108,7 @@ export default function TabPrediction({ data }: { data?: PredictionData }) {
       )}
       {data.disclaimer && (
         <FigmaReportCard title="预测说明" icon="file" tab={TAB} evidence="证据来源：模型限制说明" level="Ⅱ级">
-          <div className="figma-card__text">{data.disclaimer}</div>
+          <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{typeof data.disclaimer === 'string' ? data.disclaimer : JSON.stringify(data.disclaimer, null, 2)}</div>
         </FigmaReportCard>
       )}
     </div>

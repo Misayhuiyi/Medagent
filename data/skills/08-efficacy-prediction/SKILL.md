@@ -20,43 +20,22 @@ changelog: |
 
 ### 2、步骤说明
 
-#### 步骤1：子Agent调用「疗效预测评分」子Skill
+三个子步骤互不依赖（各子Skill内部独立完成RAG检索），通过并行子Agent同时执行：
 
-前置步骤：RAG检索方案疗效数据
-- 调用 `../_shared/knowledge-retrieval/SKILL.md`
-- 查询内容：`"{选定治疗药物/方案} 疗效数据 肺癌 {肿瘤类型}"`
-- 查询示例：`"帕博利珠单抗 NSCLC 一线治疗 疗效数据 ORR PFS OS"`
-- top_k = 5，模式 = retrieve
+创建子Agent（`sessions_spawn_parallel`，`context="isolated"`）同时调用以下3个子Skill：
 
-创建子Agent（sessions_spawn, context=isolated）调用 skills/efficacy-prediction-scoring/SKILL.md：
-- 根据患者概况+RAG检索到的疗效数据对选定方案进行疗效预测评分
-- 绘图：横坐标=生存时间，纵坐标=不同病灶肿瘤大小的变化曲线
-- 图表中标注RAG检索到的参考数据
+```json
+[
+  "skills/efficacy-prediction-scoring/SKILL.md",
+  "skills/adverse-event-prediction/SKILL.md",
+  "skills/prognosis-prediction/SKILL.md"
+]
+```
 
-#### 步骤2：子Agent调用「不良反应预测评分」子Skill
-
-前置步骤：RAG检索不良反应数据
-- 调用 `../_shared/knowledge-retrieval/SKILL.md`
-- 查询内容：`"{选定治疗药物/方案} 不良反应 {常见不良反应类型}"`
-- 查询示例：`"帕博利珠单抗 不良反应 免疫相关不良反应 发生率"`
-- top_k = 5，模式 = retrieve
-
-创建子Agent（sessions_spawn, context=isolated）调用 skills/adverse-event-prediction/SKILL.md：
-- 预测系列不良反应及其概率
-- 绘图：1种不良反应1张图，横坐标=生存时间，纵坐标=不同等级不良反应发生率
-- 标注RAG检索到的参考发生率
-
-#### 步骤3：子Agent调用「预后预测评分」子Skill
-
-前置步骤：RAG检索预后数据
-- 调用 `../_shared/knowledge-retrieval/SKILL.md`
-- 查询内容：`"{选定治疗药物/方案} 预后数据 肺癌 {分期} 生存率"`
-- top_k = 5，模式 = retrieve
-
-创建子Agent（sessions_spawn, context=isolated）调用 skills/prognosis-prediction/SKILL.md：
-- 预测进展/复发/死亡概率
-- 绘图：单张图，横坐标=生存时间，纵坐标=三条概率曲线
-- 图表中标注RAG检索到的参考数据
+各子Skill职责（每个内部独立完成RAG知识检索）：
+- **skills/efficacy-prediction-scoring/SKILL.md**：内部先RAG检索方案疗效数据，根据患者概况+RAG数据进行疗效预测评分，绘图（横坐标=生存时间，纵坐标=肿瘤大小变化曲线），标注RAG参考数据
+- **skills/adverse-event-prediction/SKILL.md**：内部先RAG检索不良反应数据，预测系列不良反应及其概率，绘图（每种不良反应1张图），标注RAG参考发生率
+- **skills/prognosis-prediction/SKILL.md**：内部先RAG检索预后数据，预测进展/复发/死亡概率，绘图（横坐标=生存时间，纵坐标=三条概率曲线），标注RAG参考数据
 
 ### 3、输出
 （1）疗效预测报告（含评分+图表+RAG引用）
@@ -67,7 +46,12 @@ changelog: |
 
 | 参考资料 | 说明 | 使用场景 |
 |----------|------|----------|
-| _shared/knowledge-retrieval/SKILL.md | RAG知识库查询 | 各步骤前置检索 |
-| skills/efficacy-prediction-scoring/SKILL.md | 疗效预测评分 | 步骤1 |
-| skills/adverse-event-prediction/SKILL.md | 不良反应预测 | 步骤2 |
-| skills/prognosis-prediction/SKILL.md | 预后预测评分 | 步骤3 |
+| _shared/knowledge-retrieval/SKILL.md | RAG知识库查询 | 各子Skill前置检索 |
+
+## 工具声明（tools）
+
+### 1、可以使用的工具、Skill等
+
+| 工具名称 | 链接或访问方式 | 说明 | 适用场景 |
+|----------|----------------|------|----------|
+| sessions_spawn_parallel | 内置工具 | 并行创建多个子Agent调用子Skill | 3个子Skill并行执行 |

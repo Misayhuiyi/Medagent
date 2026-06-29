@@ -23,54 +23,34 @@ changelog: |
 
 ### 2、步骤说明
 
-#### 步骤1：汇总现病史
+#### 步骤1-5：并行汇总五史
 
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用子Skill `skills/present-illness/SKILL.md`：
-- 从所有就诊时间的病历、医生诊疗文件夹中提取现病史描述
-- 从既往AI问诊记录中提取现病史信息
-- 去重处理：相同事件只保留一次
-- 荟萃总结：以时间先后排序，做成表格
-- 表格列：时间、事件描述、关键指标（如初诊肿瘤大小）、资料来源
-- 绘图要求：
-  - **疗效检测曲线**：每个病灶1张曲线图（横坐标=时间，纵坐标=肿瘤大小）
-  - **不良反应热力图**：1张（横坐标=时间，纵坐标=不良反应类型，颜色深浅=严重程度）
-  - **预后曲线**：1张（横坐标=时间，纵坐标=生存概率/预后评分）
-- 可选：绘图前调用 `../_shared/knowledge-retrieval/SKILL.md` 查询临床疗效评价标准和不良反应分级标准，确保图表中的参考线/阈值有循证依据
-- 输出：结构化现病史报告（含图表和RAG引用）
+五个子步骤（现病史、既往史、过敏史、个人史、家族史）互不依赖，通过并行子Agent同时执行：
 
-#### 步骤2：汇总既往史
+创建子Agent（`sessions_spawn_parallel`，`context="isolated"`）同时调用以下5个子Skill：
 
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用子Skill `skills/past-history/SKILL.md`：
-- 从所有就诊资料中提取既往史信息
-- 从既往AI问诊记录中提取既往史
-- 去重荟萃，按系统分类（呼吸系统、心血管系统、消化系统等）
-- 输出：结构化既往史报告
+```json
+[
+  "skills/present-illness/SKILL.md",
+  "skills/past-history/SKILL.md",
+  "skills/allergy-history/SKILL.md",
+  "skills/personal-history/SKILL.md",
+  "skills/family-history/SKILL.md"
+]
+```
 
-#### 步骤3：汇总过敏史
+各子Skill职责：
+- **skills/present-illness/SKILL.md**：从所有就诊时间的病历、医生诊疗文件夹中提取现病史描述，从既往AI问诊记录中提取现病史信息，去重处理，以时间先后排序做成表格，绘制疗效检测曲线、不良反应热力图、预后曲线。可选：绘图前调用RAG查询临床标准。
+- **skills/past-history/SKILL.md**：从所有就诊资料及既往AI问诊记录中提取既往史信息，去重荟萃，按系统分类（呼吸系统、心血管系统、消化系统等）。
+- **skills/allergy-history/SKILL.md**：从所有就诊资料中提取过敏信息（药物过敏、食物过敏等），去重合并。
+- **skills/personal-history/SKILL.md**：从所有就诊资料中提取个人史信息，重点提取吸烟史、职业暴露、环境因素。
+- **skills/family-history/SKILL.md**：从所有就诊资料中提取家族疾病信息，重点关注肺癌及其他恶性肿瘤、遗传性疾病，记录血缘关系。
 
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用子Skill `skills/allergy-history/SKILL.md`：
-- 从所有就诊资料中提取过敏信息（药物过敏、食物过敏等）
-- 去重合并
-- 输出：结构化过敏史报告
-
-#### 步骤4：汇总个人史
-
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用子Skill `skills/personal-history/SKILL.md`：
-- 从所有就诊资料中提取个人史信息
-- 重点提取：吸烟史（年支数、戒烟年数）、职业暴露（油烟、粉尘、化学物等）、环境因素（空气污染、二手烟）
-- 输出：结构化个人史报告
-
-#### 步骤5：汇总家族史
-
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用子Skill `skills/family-history/SKILL.md`：
-- 从所有就诊资料中提取家族疾病信息
-- 重点关注：肺癌、其他恶性肿瘤、遗传性疾病
-- 血缘关系记录（一级亲属、二级亲属）
-- 输出：结构化家族史报告
+并行执行完成后，汇总所有5个子Skill的输出。
 
 #### 步骤6：合成完整病史总结
 
-- 合并步骤1-5的输出
+- 合并步骤1-5（并行执行）的各子Skill输出
 - 按标准顺序组织：现病史 → 既往史 → 过敏史 → 个人史 → 家族史
 - 附加图表（疗效检测曲线、不良反应热力图、预后曲线）
 - 输出完整的患者病史总结报告
@@ -181,7 +161,7 @@ changelog: |
 | 工具名称 | 链接或访问方式 | 说明 | 适用场景 |
 |----------|----------------|------|----------|
 | read | 内置工具 | 读取MD文件、AI问诊记录 | 数据提取 |
-| sessions_spawn | 内置工具 | 创建子Agent调用子Skill | 调用5个子Skill |
+| sessions_spawn_parallel | 内置工具 | 并行创建多个子Agent调用子Skill | 五史并行解析 |
 | write | 内置工具 | 输出汇总报告 | 输出结果 |
 | exec | 内置工具 | 绘图（调用Python脚本等方式）| 图表生成 |
 | skills/present-illness/SKILL.md | 子Skill | 现病史汇总 | 步骤1 |

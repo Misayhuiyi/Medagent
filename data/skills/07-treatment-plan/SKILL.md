@@ -28,50 +28,44 @@ changelog: |
 - top_k = 5，模式 = retrieve
 - 输出：检索到的指南片段列表
 
-#### 步骤1：子Agent调用「指南匹配」子Skill
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用 skills/guideline-matching/SKILL.md：
-- 输入：步骤0的RAG检索结果 + 患者概况
-- 根据RAG检索到的指南内容匹配对应治疗方案
-- 以就诊时间为据选择当时最新的指南版本
-- 列出可选治疗方案（含循证等级和引用来源）
+#### 第1阶段（并行）：指南匹配 + 专家共识补充
 
-#### 步骤2：子Agent调用「专家共识补充」子Skill
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用 skills/expert-consensus-supplement/SKILL.md：
+步骤1和步骤2互不依赖，通过并行子Agent同时执行：
 
-**步骤2前置：RAG检索专家共识知识**
-在调用子Skill前，先调用 `../_shared/knowledge-retrieval/SKILL.md`：
-- 查询内容示例：`"中国肺癌专家共识 {特殊临床情况}"` 或 `"{具体问题} 专家共识 治疗"`
-- 根据患者概况中的特殊情况（如年龄>75、合并症多、PS评分2分等特殊情况）构建查询
-- top_k = 5，模式 = retrieve
-- 将检索结果作为子Skill的额外输入
+创建子Agent（`sessions_spawn_parallel`，`context="isolated"`）同时调用以下2个子Skill：
 
-子Skill执行：
-- 查找患者概况中的特殊情况（指南证据不足的点）
-- 使用RAG检索到的专家共识作为补充
-- 比较患者概况与指南描述和专家共识描述的匹配度
+```json
+[
+  "skills/guideline-matching/SKILL.md",
+  "skills/expert-consensus-supplement/SKILL.md"
+]
+```
 
-#### 步骤3：子Agent调用「方案评估」子Skill
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用 skills/plan-evaluation/SKILL.md：
-- 对每个可选方案进行疗效预测评分
-- 系列不良反应预测评分
-- 预后评分（进展/复发/死亡概率）
-- 综合评估：方案匹配度+基因检测+ECOG评分+预测评分
-- 所有评分需要引用RAG检索到的循证依据
+各子Skill职责：
+- **skills/guideline-matching/SKILL.md**：基于RAG指南检索结果 + 患者概况，匹配对应治疗方案，列出可选方案（含循证等级和引用来源）
+- **skills/expert-consensus-supplement/SKILL.md**：内部先RAG检索专家共识知识（根据患者特殊情况如年龄>75、合并症多、PS评分2分等构建查询），补充指南证据不足的点的方案建议
 
-#### 步骤4：子Agent调用「方案修改判断」子Skill
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用 skills/plan-modification-judgment/SKILL.md：
-- 判断是否需要修改当前方案
-- 按顺序判断：不良反应→疗效→可选方案
-- 修改原则5种情况（严重不良反应、严重不良反应缓解后、疗效好、耐药、多药耐药）
-- 输出修改后的治疗方案表格
+#### 第2阶段（并行）：方案评估 + 方案修改判断 + 临床试验筛选
 
-#### 步骤5：子Agent调用「临床试验筛选」子Skill
-创建子Agent（`sessions_spawn`，`context="isolated"`）调用 skills/clinical-trial-screening/SKILL.md：
-- 匹配患者概况与临床试验纳排标准
-- 优先本院临床试验
-- 符合条件的在治疗方案中推荐
+步骤3、4、5互不依赖，通过并行子Agent同时执行：
 
-#### 步骤6：输出完整治疗方案
+创建子Agent（`sessions_spawn_parallel`，`context="isolated"`）同时调用以下3个子Skill：
+
+```json
+[
+  "skills/plan-evaluation/SKILL.md",
+  "skills/plan-modification-judgment/SKILL.md",
+  "skills/clinical-trial-screening/SKILL.md"
+]
+```
+
+各子Skill职责：
+- **skills/plan-evaluation/SKILL.md**：对第1阶段输出的每个可选方案进行疗效预测评分、不良反应预测评分、预后评分、综合评估
+- **skills/plan-modification-judgment/SKILL.md**：基于患者当前方案和AE数据，判断是否需要修改方案（按不良反应→疗效→可选方案顺序判断），输出修改后的治疗方案表格
+- **skills/clinical-trial-screening/SKILL.md**：匹配患者概况与临床试验纳排标准，优先本院临床试验
+
+#### 步骤6：合并输出完整治疗方案
+- 合并第1阶段和第2阶段的全部输出
 - 针对肿瘤的治疗方案（含药品、剂量、周期等，附RAG引用来源）
 - 针对不良反应的治疗方案（若有，附RAG引用来源）
 - 针对合并症的治疗方案（若有，附RAG引用来源）
@@ -132,12 +126,10 @@ changelog: |
 | 工具名称 | 链接或访问方式 | 说明 | 适用场景 |
 |----------|----------------|------|----------|
 | read | 内置工具 | 读取患者概况 | 读取输入 |
-| sessions_spawn | 内置工具 | 创建子Agent调用子Skill | 调用子Skill执行 |
+| sessions_spawn | 内置工具 | 创建子Agent调用子Skill | 步骤0RAG检索 |
+| sessions_spawn_parallel | 内置工具 | 并行创建多个子Agent调用子Skill | 第1/2阶段并行组 |
 | exec | 内置工具 | 执行RAG查询脚本 | RAG知识检索 |
 | _shared/knowledge-retrieval/SKILL.md | 共享子Skill | RAG知识库查询 | 知识检索 |
-| skills/guideline-matching/SKILL.md | 子Skill | 指南匹配 | 步骤1 |
-| skills/expert-consensus-supplement/SKILL.md | 子Skill | 专家共识补充 | 步骤2 |
-| skills/plan-evaluation/SKILL.md | 子Skill | 方案评估 | 步骤3 |
 
 ### 2、不可使用的工具
 （1）禁止跳过RAG检索直接使用模型自身知识做指南匹配

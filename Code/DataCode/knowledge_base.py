@@ -57,6 +57,10 @@ class RagKnowledgeBase:
         if str(self._kb_dir) not in sys.path:
             sys.path.insert(0, str(self._kb_dir))
         self._initialized = False
+        # 查询级缓存：相同 question+top_k 的检索结果幂等，避免重复 embedding+ChromaDB 查询
+        self._query_cache: dict[str, list[KnowledgeResult]] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def _ensure_init(self):
         if self._initialized:
@@ -77,6 +81,14 @@ class RagKnowledgeBase:
         min_evidence: int = 0,
         before_date: str | None = None,
     ) -> list[KnowledgeResult]:
+        # 缓存命中检查：包含所有过滤参数确保缓存正确
+        cache_key = f"{question.strip()[:120]}:{top_k}:{min_evidence}:{before_date or 'any'}"
+        if cache_key in self._query_cache:
+            self._cache_hits += 1
+            logger.debug("KB cache HIT (total hits=%d)", self._cache_hits)
+            return self._query_cache[cache_key]
+
+        self._cache_misses += 1
         self._ensure_init()
         try:
             raw_results = await asyncio.to_thread(
@@ -101,7 +113,10 @@ class RagKnowledgeBase:
                 effective_date=year,
                 guideline_edition=item.get("guideline_edition", ""),
             ))
-        return results[:top_k]
+        results = results[:top_k]
+        # 写入缓存
+        self._query_cache[cache_key] = results
+        return results
 
     _evidence_mapping: dict | None = None
 
@@ -145,8 +160,25 @@ class RagKnowledgeBase:
             EvidenceLevel.INTERNATIONAL_GUIDELINE[0]: "国际权威指南",
             EvidenceLevel.NATIONAL_GUIDELINE[0]: "国内权威指南",
             EvidenceLevel.INTERNATIONAL_CONSENSUS[0]: "国际专家共识",
+            EvidenceLevel.NATIONAL_CONSENSUS[0]: "国内专家共识",
+            EvidenceLevel.HIGH_QUALITY_RCT[0]: "临床试验（高质量Meta分析/RCT）",
+            EvidenceLevel.REAL_WORLD_STUDY[0]: "真实世界研究/观察性研究",
+            EvidenceLevel.CASE_REPORT[0]: "病例系列/个案报告",
             EvidenceLevel.EXPERT_OPINION[0]: "专家意见",
         }
         return mapping.get(level, "未分类")
+
+    async def warmup(self) -> None:
+        """预热知识库：提前加载 embedding 模型和 ChromaDB，避免首次查询 2-5s 延迟。
+
+        在服务器启动时调用一次即可。可在 asyncio.create_task 中后台执行。
+        """
+        try:
+            self._ensure_init()
+            # 执行一次空查询触发模型加载
+            await self.query(question="预热知识库", top_k=1)
+            logger.info("KB warmup complete (cache misses=%d)", self._cache_misses)
+        except Exception as e:
+            logger.warning("KB warmup failed (non-fatal): %s", e)
 
 

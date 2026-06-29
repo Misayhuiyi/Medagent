@@ -42,6 +42,8 @@ def create_deep_agent(
     logger: ExecutionLogger | None = None,
     agent_name: str = "",
     parallel_tool_calls: bool = True,
+    llm: Any = None,
+    force_serial: bool = False,
 ):
     """创建 DeepAgent（LangGraph ReAct Agent）。
 
@@ -55,31 +57,50 @@ def create_deep_agent(
         logger: 可选 ExecutionLogger，记录执行过程。
         agent_name: Agent 名称，用于日志。
         parallel_tool_calls: 是否允许并行工具调用。默认 True（允许并行）。设为 False 强制顺序执行，提升推理质量。
+        llm: 可选预创建的 ChatOpenAI 实例。传入后跳过客户端创建，实现多 Agent 共享 LLM 客户端，减少重复初始化开销。
+        force_serial: 强制串行工具调用（覆盖 parallel_tool_calls=False）。
+            仅用于步骤 06（患者概况）等有严格 RAG→子Agent 依赖链的场景。
+            轻量步骤（01-04、10）不传此参数，保持 parallel_tool_calls 配置不变。
 
     Returns:
         CompiledStateGraph：可调用的 LangGraph Agent。
     """
-    llm = ChatOpenAI(
-        model=model,
-        base_url=base_url or None,
-        api_key=api_key or "dummy",
-        temperature=0.7,
-        default_headers={"User-Agent": "curl/8.17.0"},
-        callbacks=[LLMCallbackHandler(
-            agent_name=agent_name or "anonymous",
+    if llm is None:
+        llm = ChatOpenAI(
             model=model,
-            base_url=base_url or "",
-            api_key=api_key or "",
-        )],
-    )
+            base_url=base_url or None,
+            api_key=api_key or "dummy",
+            temperature=0.7,
+            default_headers={"User-Agent": "curl/8.17.0"},
+        )
+    # LLMCallbackHandler 通过 agent.ainvoke(config={"callbacks": [...]}) 传入，
+    # 不再绑定到 LLM 客户端构造函数（避免共享客户端时回调冲突）。
 
-    if not parallel_tool_calls:
-        _orig_bind = llm.bind_tools
+    # 仅当 force_serial=True 时才强制禁用并行工具调用。
+    # 轻量步骤（01-04、10）不传 force_serial，保持 parallel_tool_calls 原配置。
+    should_disable_parallel = force_serial or (not parallel_tool_calls)
+    if should_disable_parallel:
+        # 共享 LLM 客户端场景：上一个 create_deep_agent 调用可能已包装 bind_tools。
+        # 先恢复原始版本，避免双重包装导致 "multiple values for keyword argument
+        # 'parallel_tool_calls'" 错误。
+        raw_bind = getattr(llm, "_raw_bind_tools", None)
+        if raw_bind is not None:
+            object.__setattr__(llm, "bind_tools", raw_bind)
+        else:
+            raw_bind = llm.bind_tools
 
         def _bind_tools_sequential(_tools, **kw):
-            return _orig_bind(_tools, parallel_tool_calls=False, **kw)
+            return raw_bind(_tools, parallel_tool_calls=False, **kw)
 
+        object.__setattr__(llm, "_raw_bind_tools", raw_bind)
         object.__setattr__(llm, "bind_tools", _bind_tools_sequential)
+    else:
+        # 恢复原始 bind_tools（修复拼接顺序 bug：上一步可能已替换为 _bind_tools_sequential，
+        # 但当前步骤需要并行工具调用）
+        raw = getattr(llm, "_raw_bind_tools", None)
+        if raw is not None:
+            object.__setattr__(llm, "bind_tools", raw)
+            object.__delattr__(llm, "_raw_bind_tools")
 
     if mode == "sequential":
         return _SequentialAgent(llm, system_prompt, tools, logger, agent_name)

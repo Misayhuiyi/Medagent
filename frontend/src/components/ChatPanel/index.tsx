@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { message } from 'antd'
 import { usePatientStore, useChatStore } from '../../store'
 import { fetchChatHistory } from '../../services/api'
 import { useChat } from '../../hooks/useChat'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
+import type { EncounterFilter } from '../../types'
 
 function CloseIcon() {
   return (
@@ -22,11 +23,20 @@ function AddIcon() {
   )
 }
 
+function formatDate(date: string) {
+  if (!date) return ''
+  const parts = date.split('-')
+  if (parts.length !== 3) return date
+  return `${parts[0]}-${Number(parts[1])}-${Number(parts[2])}`
+}
+
 export default function ChatPanel() {
   const selectedId = usePatientStore((s) => s.selectedId)
   const patients = usePatientStore((s) => s.patients)
   const selectPatient = usePatientStore((s) => s.selectPatient)
   const removePatient = usePatientStore((s) => s.removePatient)
+  const selectedEncounter = usePatientStore((s) => s.selectedEncounter)
+  const setSelectedEncounter = usePatientStore((s) => s.setSelectedEncounter)
   const messages = useChatStore((s) => s.messages)
   const isStreaming = useChatStore((s) => s.isStreaming)
   const addMessages = useChatStore((s) => s.addMessages)
@@ -34,6 +44,35 @@ export default function ChatPanel() {
   const setThinkingTime = useChatStore((s) => s.setThinkingTime)
   const { sendMessage, generateReport, abort } = useChat(selectedId)
   const [showThinking, setShowThinking] = useState(true)
+
+  // 当前患者的就诊记录列表
+  const selectedPatient = patients.find((p) => p.id === selectedId)
+  const encounterList = useMemo(() => {
+    const encs = selectedPatient?.encounters || []
+    return encs.map((enc, i) => ({
+      index: i,
+      admission: enc.admission,
+      discharge: enc.discharge,
+      label: `入院时间 ${formatDate(enc.admission)}`,
+    }))
+  }, [selectedPatient])
+
+  // 切换就诊选择
+  const handleSelectEncounter = (encounter: EncounterFilter | null) => {
+    setSelectedEncounter(encounter)
+  }
+
+  // 生成报告 — 传入当前选择的就诊时间
+  const handleGenerateReport = () => {
+    if (selectedEncounter) {
+      generateReport(
+        `请基于患者该次就诊（${formatDate(selectedEncounter.admission)}）的病历、检查报告，生成患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。`,
+        selectedEncounter,
+      )
+    } else {
+      generateReport('请基于患者全部病历、检查报告和当前对话，生成患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。')
+    }
+  }
 
   // Thinking timer
   const thinkingStart = useRef(0)
@@ -112,6 +151,41 @@ export default function ChatPanel() {
           <span className={`switch-track ${showThinking ? 'is-on' : ''}`} aria-hidden="true" />
         </label>
       </div>
+      {/* 就诊时间选择条 */}
+      {encounterList.length > 1 && (
+        <div className="encounter-selector">
+          <span className="encounter-selector__label">就诊范围：</span>
+          <div className="encounter-selector__chips">
+            <button
+              className={`encounter-chip ${selectedEncounter === null ? 'is-active' : ''}`}
+              type="button"
+              onClick={() => handleSelectEncounter(null)}
+            >
+              全部就诊
+            </button>
+            {encounterList.map((enc) => {
+              const isActive =
+                selectedEncounter !== null &&
+                selectedEncounter.admission === enc.admission
+              return (
+                <button
+                  className={`encounter-chip ${isActive ? 'is-active' : ''}`}
+                  key={enc.index}
+                  type="button"
+                  onClick={() =>
+                    handleSelectEncounter({
+                      admission: enc.admission,
+                      discharge: enc.discharge,
+                    })
+                  }
+                >
+                  {enc.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
       <MessageList messages={messages} showThinking={showThinking} />
       <div className="quick-actions-bar">
         <button
@@ -126,7 +200,7 @@ export default function ChatPanel() {
           className="quick-action-btn quick-action-btn--primary"
           type="button"
           disabled={isStreaming}
-          onClick={() => generateReport('请基于患者全部病历、检查报告和当前对话，生成患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。')}
+          onClick={handleGenerateReport}
         >
           生成报告
         </button>

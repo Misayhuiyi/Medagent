@@ -39,6 +39,13 @@ export interface ChatMessage {
 
 export interface MessageRequest {
   message: string
+  mode?: 'chat' | 'report' | 'auto'
+  encounter?: EncounterFilter | null
+}
+
+export interface EncounterFilter {
+  admission: string
+  discharge: string
 }
 
 // ── SSE 事件（判别联合） ──

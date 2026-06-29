@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 
 from DataCode.tool_registry import ToolDef
+
+logger = logging.getLogger(__name__)
 
 
 READ_ALLOWED = ["TempData/", "Result/", "Data/skills/", "Data/agents/", "Data/memory/", "Data/"]
@@ -58,6 +61,147 @@ def create_read_file_tool(project_root: str) -> ToolDef:
         source="builtin",
         handler=handler,
     )
+
+
+def create_batch_pdf_conversion_tool(project_root: str) -> ToolDef:
+    """批量 PDF → MD 转换工具。一次调用完成目录下所有 PDF 的转换。
+    
+    替代逐文件 read/write 循环（每文件 2+ 轮），将 42+ 轮减少到 1 轮。
+    """
+    import json
+    root = Path(project_root).resolve()
+
+    def handler(dir_path: str) -> str:
+        try:
+            target = (root / dir_path).resolve()
+            relative = target.relative_to(root)
+        except ValueError:
+            return json.dumps({"error": f"路径 '{dir_path}' 超出项目范围"}, ensure_ascii=False)
+        
+        if not target.is_dir():
+            return json.dumps({"error": f"目录 '{dir_path}' 不存在"}, ensure_ascii=False)
+        
+        try:
+            import fitz
+        except ImportError:
+            # 回退：pypdf2
+            try:
+                import PyPDF2
+                return _convert_via_pypdf2(target)
+            except ImportError:
+                return json.dumps({"error": "pymupdf (fitz) 和 PyPDF2 均未安装"}, ensure_ascii=False)
+        
+        pdf_files = sorted(target.rglob("*.pdf"))
+        if not pdf_files:
+            return json.dumps({
+                "totalFiles": 0, "successCount": 0, "failCount": 0,
+                "mdFilePaths": [], "message": "No PDF files found"
+            }, ensure_ascii=False)
+        
+        results = []
+        success = 0
+        failed = 0
+        md_paths = []
+        
+        for pdf_path in pdf_files:
+            try:
+                doc = fitz.open(str(pdf_path))
+                md_lines = []
+                for page in doc:
+                    text = page.get_text("text")
+                    md_lines.append(text if text.strip() else f"[Page {page.number+1}: no extractable text]")
+                md_content = "\n\n".join(md_lines)
+                doc.close()
+                
+                md_path = pdf_path.with_suffix(".md")
+                md_path.write_text(md_content, encoding="utf-8")
+                
+                rel_source = str(pdf_path.relative_to(target))
+                rel_target = str(md_path.relative_to(target))
+                
+                results.append({
+                    "sourceFile": rel_source,
+                    "targetFile": rel_target,
+                    "status": "success" if len(md_content) > 0 else "empty",
+                    "method": "text",
+                    "pageCount": len(md_lines),
+                    "charCount": len(md_content),
+                })
+                success += 1
+                md_paths.append(str(md_path))
+            except Exception as e:
+                results.append({
+                    "sourceFile": str(pdf_path.relative_to(target)),
+                    "status": "failed",
+                    "error": str(e),
+                })
+                failed += 1
+        
+        report = {
+            "totalFiles": len(pdf_files),
+            "successCount": success,
+            "failCount": failed,
+            "mdFilePaths": md_paths,
+            "conversionResults": results,
+        }
+        
+        # 同时写 conversion_report.json 供后续步骤读取
+        report_path = target / "conversion_report.json"
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        
+        return json.dumps(report, ensure_ascii=False)
+    
+    return ToolDef(
+        name="batch_pdf_to_md",
+        description=(
+            "批量将目录下所有 PDF 文件转换为 Markdown 文件。"
+            "一次调用处理全部 PDF，生成的 .md 文件保存在 PDF 同目录。"
+            "输入 dir_path 为相对于项目根目录的路径（如 '本地患者库/张三_001/2026-01-15'）。"
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "dir_path": {"type": "string", "description": "患者就诊时间目录（相对于项目根的路径）"},
+            },
+            "required": ["dir_path"],
+        },
+        source="builtin",
+        handler=handler,
+    )
+
+
+def _convert_via_pypdf2(directory: Path) -> str:
+    """PyPDF2 回退方案。"""
+    import json
+    pdf_files = sorted(directory.rglob("*.pdf"))
+    success = 0
+    failed = 0
+    results = []
+    
+    for pdf_path in pdf_files:
+        try:
+            import PyPDF2
+            with open(pdf_path, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                md_lines = []
+                for i, page in enumerate(reader.pages):
+                    text = page.extract_text() or ""
+                    md_lines.append(text if text.strip() else f"[Page {i+1}: no extractable text]")
+            md_content = "\n\n".join(md_lines)
+            md_path = pdf_path.with_suffix(".md")
+            md_path.write_text(md_content, encoding="utf-8")
+            results.append({"sourceFile": str(pdf_path.name), "status": "success"})
+            success += 1
+        except Exception as e:
+            results.append({"sourceFile": str(pdf_path.name), "status": "failed", "error": str(e)})
+            failed += 1
+    
+    return json.dumps({
+        "totalFiles": len(pdf_files),
+        "successCount": success,
+        "failCount": failed,
+        "conversionResults": results,
+    }, ensure_ascii=False)
 
 
 def create_write_file_tool(project_root: str) -> ToolDef:

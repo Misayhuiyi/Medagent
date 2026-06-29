@@ -10,13 +10,73 @@ const COLOR_MAP: Record<string, string> = {
   red: '#ff3b30',
 }
 
-function HistoryTextCard({ title, content, evidence }: { title: string; content: string; evidence: string }) {
-  if (!content) return null
+function safeText(v: unknown): string {
+  if (!v) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'object') {
+    const obj = v as Record<string, unknown>
+    if ('summary' in obj && typeof obj.summary === 'string') return obj.summary as string
+    // 个人史格式：{smoking:{status,packYears}, alcohol:{status}}
+    if ('smoking' in obj || 'alcohol' in obj) {
+      const parts: string[] = []
+      if (obj.smoking && typeof obj.smoking === 'object') {
+        const s = obj.smoking as Record<string, unknown>
+        parts.push(`吸烟：${s.status || ''}${s.packYears ? ' (' + s.packYears + '包年)' : ''}`)
+      }
+      if (obj.alcohol && typeof obj.alcohol === 'object') {
+        const a = obj.alcohol as Record<string, unknown>
+        parts.push(`饮酒：${a.status || ''}`)
+      }
+      if (obj.occupationalExposure && Array.isArray(obj.occupationalExposure)) {
+        const items = obj.occupationalExposure.map((e: unknown) => {
+          if (typeof e === 'object' && e) {
+            const ee = e as Record<string, string>
+            return `${ee.exposure || ''}（${ee.detail || ''}）`
+          }
+          return String(e)
+        })
+        if (items.length) parts.push(`职业暴露：${items.join('；')}`)
+      }
+      return parts.filter(Boolean).join('\n')
+    }
+    // details 数组 → 系统分类列表
+    if ('details' in obj && Array.isArray(obj.details)) {
+      return obj.details.map((d: unknown) => {
+        if (typeof d === 'object' && d) {
+          const dd = d as Record<string, string>
+          return `${dd.system || ''}：${dd.disease || ''}${dd.notes ? '（' + dd.notes + '）' : ''}`
+        }
+        return String(d)
+      }).filter(Boolean).join('\n')
+    }
+    return JSON.stringify(v, null, 2)
+  }
+  return String(v)
+}
+
+function HistoryTextCard({ title, content, evidence }: { title: string; content: unknown; evidence: string }) {
+  const text = safeText(content)
+  if (!text) return null
   return (
     <FigmaReportCard title={title} icon="history" evidence={evidence} tab={TAB}>
-      <div className="figma-card__text">{content}</div>
+      <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
     </FigmaReportCard>
   )
+}
+
+function normalizeTimeline(timeline: unknown): TimelineItem[] {
+  if (!Array.isArray(timeline)) return []
+  return timeline.map((item: unknown) => {
+    if (typeof item !== 'object' || !item) return item as TimelineItem
+    const raw = item as Record<string, unknown>
+    return {
+      date: String(raw.date || raw.time || ''),
+      label: String(raw.label || raw.event || ''),
+      content: String(raw.content || raw.detail || raw.event || ''),
+      color: (raw.color as TimelineItem['color']) || 'blue',
+      type: String(raw.type || raw.stage || ''),
+    }
+  })
 }
 
 function TimelineView({ timeline }: { timeline: TimelineItem[] }) {
@@ -74,10 +134,10 @@ export default function TabHistory({ data }: { data?: HistoryData }) {
   return (
     <div className="report-tab-content history-tab-content">
       <FigmaReportCard title="患者病史核心原始数据" icon="history" evidence="证据来源：门诊病历 + 住院病历 + 检查报告" tab={TAB}>
-        <div className="report-stat-value">问诊次数：{data.visit_count} 次</div>
+        <div className="report-stat-value">问诊次数：{typeof data.visit_count === 'number' ? data.visit_count : (typeof data.visit_count === 'object' ? safeText(data.visit_count) : data.visit_count || '未知')} 次</div>
       </FigmaReportCard>
       <FigmaReportCard title="现病史时间线" icon="history" evidence="证据来源：病程记录 + 影像报告 + 治疗记录" tab={TAB}>
-        <TimelineView timeline={data.present_illness?.timeline || []} />
+        <TimelineView timeline={normalizeTimeline(data.present_illness?.timeline)} />
       </FigmaReportCard>
       {data.present_illness?.tumor_size_chart && (
         <FigmaReportCard title="肿瘤大小趋势" icon="chart" evidence="证据来源：影像测量记录" tab={TAB}>

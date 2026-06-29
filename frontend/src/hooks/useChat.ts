@@ -1,7 +1,15 @@
 import { useCallback, useRef } from 'react'
 import { useChatStore, useReportStore } from '../store'
 import { parseSSE } from '../services/api'
-import type { SSEEvent, TabName } from '../types'
+import type { SSEEvent, TabName, EncounterFilter } from '../types'
+
+const REPORT_KEYWORDS = ['生成报告', '完整报告', '门诊报告', '更新右侧', '更新报告', '右侧报告', '结构化报告']
+
+function inferRequestedMode(content: string, mode: 'chat' | 'report' | 'auto'): 'chat' | 'report' {
+  if (mode === 'report') return 'report'
+  if (mode === 'chat') return 'chat'
+  return REPORT_KEYWORDS.some((keyword) => content.includes(keyword)) ? 'report' : 'chat'
+}
 
 export function useChat(patientId: string | null) {
   const abortRef = useRef<AbortController | null>(null)
@@ -24,7 +32,11 @@ export function useChat(patientId: string | null) {
     }
   }, [setStreaming])
 
-  const sendMessage = useCallback(async (content: string, mode: 'chat' | 'report' | 'auto' = 'auto') => {
+  const sendMessage = useCallback(async (
+    content: string,
+    mode: 'chat' | 'report' | 'auto' = 'auto',
+    encounter?: EncounterFilter | null,
+  ) => {
     if (!patientId) return
 
     abort()
@@ -33,17 +45,22 @@ export function useChat(patientId: string | null) {
     abortRef.current = controller
 
     addMessage({ role: 'user', content, timestamp: new Date().toISOString() })
+    modeRef.current = inferRequestedMode(content, mode)
     setStreaming(true)
+    setLastEventId(undefined)
 
     try {
-      const lastId = useChatStore.getState().lastEventId
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (lastId) headers['Last-Event-ID'] = String(lastId)
+
+      const body: Record<string, unknown> = { message: content, mode }
+      if (encounter) {
+        body.encounter = encounter
+      }
 
       const response = await fetch(`/api/chat/${encodeURIComponent(patientId)}/messages`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ message: content, mode }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       })
 
@@ -86,7 +103,7 @@ export function useChat(patientId: string | null) {
       setStreaming(false)
       abortRef.current = null
     }
-  }, [patientId, abort, addMessage, setStreaming])
+  }, [patientId, abort, addMessage, setStreaming, setLastEventId])
 
   function handleEvent(event: SSEEvent) {
     if (event.id) setLastEventId(event.id)
@@ -152,7 +169,11 @@ export function useChat(patientId: string | null) {
     }
   }
 
-  const generateReport = useCallback((content: string): Promise<void> => sendMessage(content, 'report'), [sendMessage])
+  const generateReport = useCallback(
+    (content: string, encounter?: EncounterFilter | null): Promise<void> =>
+      sendMessage(content, 'report', encounter),
+    [sendMessage],
+  )
 
   return { sendMessage, generateReport, abort }
 }

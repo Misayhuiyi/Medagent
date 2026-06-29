@@ -4,12 +4,17 @@
   - mode = "chat"   主 LLM 直接回答（默认）
   - mode = "report" 子 LLM 串行执行 5 个 Skill，更新右侧报告
   - mode = "auto"   根据消息关键词自动判断
+
+encounter 参数（可选）：
+  - null / 不传：使用全部患者文件（当前行为）
+  - {admission, discharge}：只使用该次就诊时间范围内的文件
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re as _re
 from pathlib import Path
 from datetime import datetime
 from typing import Literal
@@ -26,10 +31,18 @@ _REPORT_KEYWORDS = (
     "五个页签", "5个页签", "右侧报告", "结构化报告",
 )
 
+_DATE_RANGE_RE = _re.compile(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})')
+
+
+class EncounterFilter(BaseModel):
+    admission: str = ""
+    discharge: str = ""
+
 
 class MessageRequest(BaseModel):
     message: str
     mode: Literal["chat", "report", "auto"] = Field(default="auto")
+    encounter: EncounterFilter | None = Field(default=None, description="按就诊时间过滤文件，null=全部")
 
 
 def _get_state(key: str) -> str:
@@ -74,6 +87,57 @@ def _load_patient_files(patient_id: str) -> list[dict]:
         stem = md_file.stem
         files.append({"name": f"{category}/{stem}.pdf", "content": content})
     return files
+
+
+def _extract_dates(content: str) -> list[str]:
+    """提取文件内容中 2020-2030 范围内的所有日期字符串。"""
+    dates: list[str] = []
+    for m in _DATE_RANGE_RE.finditer(content[:2000]):
+        y, mo, dy = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
+        if 2020 <= int(y) <= 2030:
+            dates.append(f"{y}-{mo}-{dy}")
+    return dates
+
+
+def _extract_file_date(file_name: str, content: str) -> str | None:
+    """从文件名或内容中提取文件的就诊日期。
+
+    优先级：
+    1. 文件名中的日期（如 病历/2023-12-05_入院记录.pdf → 2023-12-05）
+    2. 文件内容中的最早日期（备用）
+
+    文件名日期才是文档的**真实就诊时间**，内容中可能包含多年前的历史日期。
+    """
+    # 1. 尝试文件名
+    stem = file_name.replace("\\", "/").split("/")[-1]  # "2023-12-05_入院记录.pdf"
+    for m in _DATE_RANGE_RE.finditer(stem):
+        y, mo, dy = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
+        if 2020 <= int(y) <= 2030:
+            return f"{y}-{mo}-{dy}"
+    # 2. 回退：内容最早日期
+    dates = _extract_dates(content)
+    return min(dates) if dates else None
+
+
+def _filter_files_by_encounter(
+    files: list[dict],
+    encounter: EncounterFilter | None,
+) -> list[dict]:
+    """按就诊时间范围过滤文件。encounter=None 时返回全部文件。"""
+    if encounter is None:
+        return files
+    adm = encounter.admission
+    dis = encounter.discharge or adm
+    if not adm:
+        return files
+    filtered: list[dict] = []
+    for f in files:
+        file_dt = _extract_file_date(f["name"], f["content"])
+        if not file_dt:
+            continue
+        if adm <= file_dt <= dis:
+            filtered.append(f)
+    return filtered
 
 
 def _format_sse(event: dict) -> str:
@@ -145,7 +209,13 @@ async def send_message(patient_id: str, body: MessageRequest):
                 return
 
             files = _load_patient_files(patient_id)
-            logger.info("Chat patient=%s loaded_files=%d mode=%s", patient_id, len(files), mode)
+            # 按就诊时间过滤（encounter 参数）
+            filtered_files = _filter_files_by_encounter(files, body.encounter)
+            logger.info(
+                "Chat patient=%s loaded_files=%d filtered_files=%d mode=%s encounter=%s",
+                patient_id, len(files), len(filtered_files), mode,
+                body.encounter.model_dump_json() if body.encounter else "all",
+            )
 
             assistant_buffer: list[str] = []
 
@@ -153,7 +223,7 @@ async def send_message(patient_id: str, body: MessageRequest):
                 yield _format_sse({"id": 0, "event": "mode", "data": {"mode": "chat"}})
                 async for event in executor.execute_chat(
                     patient_id=patient_id,
-                    files=files,
+                    files=filtered_files,
                     message=body.message,
                     history=history_before,
                 ):
@@ -161,11 +231,15 @@ async def send_message(patient_id: str, body: MessageRequest):
                         assistant_buffer.append(str(event["data"].get("content", "")))
                     yield _format_sse(event)
             else:
-                visit_date = _extract_visit_date(files)
+                # 如果指定了就诊时间，用该时间作为 visit_date
+                visit_date = (
+                    body.encounter.admission if body.encounter and body.encounter.admission
+                    else _extract_visit_date(files)
+                )
                 yield _format_sse({"id": 0, "event": "mode", "data": {"mode": "report"}})
                 async for event in executor.execute_report_skills(
                     patient_id=patient_id,
-                    files=files,
+                    files=filtered_files,
                     message=body.message,
                     visit_date=visit_date,
                 ):

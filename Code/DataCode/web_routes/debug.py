@@ -127,3 +127,37 @@ async def tail_logs(lines: int = Query(default=200, ge=1, le=2000), name: str = 
 @router.get("/llm/recent")
 async def recent_calls(limit: int = Query(default=30, ge=1, le=200)):
     return {"calls": LLMCallTracker.instance().recent(limit)}
+
+
+@router.get("/pipeline/{patient_id}")
+async def pipeline_history(patient_id: str, limit: int = Query(default=10, ge=1, le=50)):
+    """返回该患者的最近 pipeline 运行摘要。"""
+    import json as _json
+    from glob import glob
+    project_root = _get_state("project_root") or "."
+    pattern = str(Path(project_root) / "Result" / "logs" / f"pipeline_{patient_id}_*.json")
+    files = sorted(glob(pattern), reverse=True)[:limit]
+    results = []
+    for f in files:
+        try:
+            results.append(_json.loads(Path(f).read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return {"patient_id": patient_id, "runs": results}
+
+
+@router.get("/pipeline")
+async def all_pipeline_runs(limit: int = Query(default=20, ge=1, le=100)):
+    """返回所有患者的最新 pipeline 运行摘要（按时间倒序）。"""
+    import json as _json
+    from glob import glob
+    project_root = _get_state("project_root") or "."
+    pattern = str(Path(project_root) / "Result" / "logs" / "pipeline_*.json")
+    files = sorted(glob(pattern), reverse=True)[:limit]
+    results = []
+    for f in files:
+        try:
+            results.append(_json.loads(Path(f).read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return {"runs": results}

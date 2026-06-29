@@ -15,7 +15,8 @@ const STRATEGY_COLORS: Record<string, string> = {
 }
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
-  const normalized = value > 1 ? value / 10 : value
+  const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0
+  const normalized = safeValue > 1 ? safeValue / 10 : safeValue
   const pct = Math.min(100, Math.max(0, normalized * 100))
   return (
     <div className="score-row">
@@ -42,8 +43,8 @@ function PlanCard({ plan }: { plan: TreatmentPlan }) {
           </svg>
         </span>
         <span className="treatment-plan-name">
-          {plan.name}
-          <span className="treatment-plan-score"> | 获益评分：{((plan.efficacy_score + plan.prognosis_score) / 2).toFixed(2)}</span>
+          {plan.name || '未命名方案'}
+          <span className="treatment-plan-score"> | 获益评分：{(((Number(plan.efficacy_score) || 0) + (Number(plan.prognosis_score) || 0)) / 2).toFixed(2)}</span>
         </span>
         {plan.strategy && (
           <Tag className="treatment-strategy-tag" color={STRATEGY_COLORS[plan.strategy] || '#8e8e93'}>
@@ -74,11 +75,54 @@ function PlanCard({ plan }: { plan: TreatmentPlan }) {
   )
 }
 
-function TreatmentTextCard({ title, content, evidence }: { title: string; content: string; evidence: string }) {
-  if (!content) return null
+function safeText(v: unknown): string {
+  if (!v) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'object') {
+    const obj = v as Record<string, unknown>
+    if ('summary' in obj && typeof obj.summary === 'string') return obj.summary as string
+    if ('smoking' in obj || 'alcohol' in obj) {
+      const parts: string[] = []
+      if (obj.smoking && typeof obj.smoking === 'object') {
+        const s = obj.smoking as Record<string, unknown>
+        parts.push(`吸烟：${s.status || ''}${s.packYears ? ' (' + s.packYears + '包年)' : ''}`)
+      }
+      if (obj.alcohol && typeof obj.alcohol === 'object') {
+        const a = obj.alcohol as Record<string, unknown>
+        parts.push(`饮酒：${a.status || ''}`)
+      }
+      if (obj.occupationalExposure && Array.isArray(obj.occupationalExposure)) {
+        const items = obj.occupationalExposure.map((e: unknown) => {
+          if (typeof e === 'object' && e) {
+            const ee = e as Record<string, string>
+            return `${ee.exposure || ''}（${ee.detail || ''}）`
+          }
+          return String(e)
+        })
+        if (items.length) parts.push(`职业暴露：${items.join('；')}`)
+      }
+      return parts.filter(Boolean).join('\n')
+    }
+    if ('details' in obj && Array.isArray(obj.details)) {
+      return obj.details.map((d: unknown) => {
+        if (typeof d === 'object' && d) {
+          const dd = d as Record<string, string>
+          return `${dd.system || ''}：${dd.disease || ''}${dd.notes ? '（' + dd.notes + '）' : ''}`
+        }
+        return String(d)
+      }).filter(Boolean).join('\n')
+    }
+    return JSON.stringify(v, null, 2)
+  }
+  return String(v)
+}
+
+function TreatmentTextCard({ title, content, evidence }: { title: string; content: unknown; evidence: string }) {
+  const text = safeText(content)
+  if (!text) return null
   return (
     <FigmaReportCard title={title} icon="treatment" evidence={evidence} tab={TAB}>
-      <div className="figma-card__text">{content}</div>
+      <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
     </FigmaReportCard>
   )
 }
