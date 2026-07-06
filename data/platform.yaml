@@ -3,7 +3,8 @@ llm:
   api_key: "sk-your-api-key"
   api_format: "openai"
   default_model: "deepseek-v4-flash"
-  temperature: 0.7
+  temperature: 0            # 报告生成（确定性输出）
+  chat_temperature: 0.1     # 医生对话交流（微弹性，不编造）
   context_length: 200000
   parallel_tool_calls: true
 

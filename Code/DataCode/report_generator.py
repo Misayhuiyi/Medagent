@@ -394,6 +394,12 @@ def report_to_markdown(report: dict, title: str = REPORT_TITLE,
 def report_to_html(report: dict, title: str = REPORT_TITLE,
                    patient_info: dict | None = None) -> str:
     """将报告 dict 转换为 HTML。"""
+    try:
+        from DataCode.reporting.pdf_renderer_v4 import report_to_v4_html
+        return report_to_v4_html(report, title, patient_info)
+    except Exception:
+        pass
+
     md = report_to_markdown(report, title, patient_info)
 
     lines = []
@@ -457,6 +463,24 @@ hr{{border:none;border-top:1px solid #ddd;margin:24px 0}}
 
 def report_to_pdf_bytes(report: dict, title: str = REPORT_TITLE,
                         patient_info: dict | None = None) -> bytes:
+    """生成 V4 模板 PDF。
+
+    首选 HTML/CSS 模板 + 本机 Edge/Chrome 无头打印；不可用时回退到旧 fpdf2
+    实现，保证下载接口可用。
+    """
+    try:
+        from DataCode.reporting.pdf_renderer_v4 import report_to_v4_pdf_bytes
+        return report_to_v4_pdf_bytes(report, title, patient_info)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "V4 HTML PDF renderer failed; falling back to fpdf2: %s", e
+        )
+        return _legacy_report_to_pdf_bytes(report, title, patient_info)
+
+
+def _legacy_report_to_pdf_bytes(report: dict, title: str = REPORT_TITLE,
+                                patient_info: dict | None = None) -> bytes:
     """使用 fpdf2 生成 V4 格式的中文 PDF 报告。
 
     字体优先级：SimHei > SimSun > MSYH > 内嵌字体。
@@ -473,8 +497,19 @@ def report_to_pdf_bytes(report: dict, title: str = REPORT_TITLE,
     # SimSun/MSYH 为 TTC 格式，SimKai 字宽数据异常，均导致 "Not enough horizontal space"。
     font_ok = False
     font_name = "SimHei"
-    _simhei_path = "C:/Windows/Fonts/simhei.ttf"
-    if os.path.exists(_simhei_path):
+    _simhei_path = os.environ.get("MEDAGENT_FONT_PATH", "")
+    if not _simhei_path:
+        # 从常见安装路径查找
+        _candidates = [
+            "C:/Windows/Fonts/simhei.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+        ]
+        for _p in _candidates:
+            if os.path.exists(_p):
+                _simhei_path = _p
+                break
+    if _simhei_path and os.path.exists(_simhei_path):
         try:
             pdf.add_font(font_name, "", _simhei_path)
             font_ok = True
@@ -484,7 +519,7 @@ def report_to_pdf_bytes(report: dict, title: str = REPORT_TITLE,
     if not font_ok:
         import logging
         logging.getLogger(__name__).warning(
-            "SimHei font not found at %s, PDF will use fallback (may show empty boxes)",
+            "SimHei font not found (MEDAGENT_FONT_PATH=%s), PDF will use fallback (may show empty boxes)",
             _simhei_path,
         )
 

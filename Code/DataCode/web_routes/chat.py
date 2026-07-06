@@ -236,12 +236,29 @@ async def send_message(patient_id: str, body: MessageRequest):
                     body.encounter.admission if body.encounter and body.encounter.admission
                     else _extract_visit_date(files)
                 )
+                prior_reports = ""
+                try:
+                    from DataCode.report_context import collect_prior_context_entries, format_prior_context
+
+                    prior_entries = collect_prior_context_entries(pdir, visit_date)
+                    prior_reports = format_prior_context(prior_entries)
+                    logger.info(
+                        "Report prior context patient=%s visit_date=%s entries=%d chars=%d",
+                        patient_id, visit_date, len(prior_entries), len(prior_reports),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to load prior report context patient=%s visit_date=%s",
+                        patient_id, visit_date,
+                    )
                 yield _format_sse({"id": 0, "event": "mode", "data": {"mode": "report"}})
                 async for event in executor.execute_report_skills(
                     patient_id=patient_id,
                     files=filtered_files,
                     message=body.message,
                     visit_date=visit_date,
+                    prior_reports=prior_reports,
+                    patient_dir=str(pdir),
                 ):
                     if event["event"] == "tab_ready":
                         _save_report_tab(patient_id, event["data"]["tab"], event["data"]["data"])

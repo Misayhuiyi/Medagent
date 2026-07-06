@@ -30,7 +30,11 @@ def _build_llm_candidates(config) -> list[dict]:
     return build_llm_candidates(config)
 
 
-def _init_skill_executor(project_root: str) -> None:
+def _init_skill_executor(
+    project_root: str,
+    skills_dir: str | None = None,
+    knowledge_dir: str | None = None,
+) -> None:
     """初始化 SkillExecutor 并注册到 _app_state。"""
     from DataCode.config_manager import ConfigManager
     from DataCode.tool_registry import ToolRegistry
@@ -45,7 +49,9 @@ def _init_skill_executor(project_root: str) -> None:
     from DataCode.knowledge_base import RagKnowledgeBase
     from DataCode.skill_executor import SkillExecutor
 
-    root = Path(project_root)
+    root = Path(project_root).resolve()
+    skills_root = Path(skills_dir).resolve() if skills_dir else root / "Data" / "skills"
+    knowledge_root = Path(knowledge_dir).resolve() if knowledge_dir else root / "Data" / "knowledge_base"
     config = ConfigManager(str(root / "Data" / "platform.yaml"), str(root / "Data" / "agents"))
     config.load()
 
@@ -103,18 +109,18 @@ def _init_skill_executor(project_root: str) -> None:
     context_mgr = ContextManager.from_config(config, _count_tokens)
     manager._context_manager = context_mgr
 
-    kb = RagKnowledgeBase(str(root / "Data" / "knowledge_base"))
+    kb = RagKnowledgeBase(str(knowledge_root))
 
     # 注册 RAG 查询工具（Agent 可通过此工具检索知识库）
     from DataCode.builtin_tools import create_rag_query_tool
     registry.register(create_rag_query_tool(kb))
 
     executor = SkillExecutor(agent_manager=manager, knowledge_base=kb, llm_candidates=llm_candidates)
-    loaded = executor.load_skills(str(root / "Data" / "skills"))
+    loaded = executor.load_skills(str(skills_root))
     logger.info("Loaded skills: %s", loaded)
 
     # 加载流水线配置（从 data/skills/pipeline.yaml）
-    executor.load_pipeline(str(root / "Data" / "skills" / "pipeline.yaml"))
+    executor.load_pipeline(str(skills_root / "pipeline.yaml"))
     logger.info("Pipeline steps: %s", [s.name for s in executor.pipeline_steps])
 
     _app_state["skill_executor"] = executor
@@ -124,7 +130,14 @@ def _init_skill_executor(project_root: str) -> None:
     # 后台预热知识库和文本清洗器（避免首次调用 2-5s 延迟）
     try:
         import asyncio
-        asyncio.create_task(kb.warmup())
+        loop = asyncio.get_running_loop()
+        loop.create_task(kb.warmup())
+    except RuntimeError:
+        logger.info("Skip KB warmup: no running event loop during app construction")
+    except Exception:
+        pass
+
+    try:
         from DataCode.text_cleaner import TextCleaner
         TextCleaner.warmup()
     except Exception:
@@ -162,6 +175,13 @@ def create_app(
         import sys
         # PYTHONPATH=Code 时，从工作目录推算
         project_root = str(Path.cwd())
+    project_root_path = Path(project_root).resolve()
+
+    def _resolve_project_path(path: str) -> str:
+        p = Path(path)
+        if not p.is_absolute():
+            p = project_root_path / p
+        return str(p.resolve())
 
     setup_logging(project_root)
 
@@ -191,12 +211,12 @@ def create_app(
 
     # 初始化 app state
     _load_env_file(project_root)
-    _app_state["patients_dir"] = str(Path(patients_dir).resolve())
-    _app_state["skills_dir"] = str(Path(skills_dir).resolve())
-    _app_state["knowledge_dir"] = str(Path(knowledge_dir).resolve())
-    _app_state["reports_dir"] = str(Path(reports_dir).resolve())
-    _app_state["memory_dir"] = str(Path(memory_dir).resolve())
-    _app_state["project_root"] = project_root
+    _app_state["patients_dir"] = _resolve_project_path(patients_dir)
+    _app_state["skills_dir"] = _resolve_project_path(skills_dir)
+    _app_state["knowledge_dir"] = _resolve_project_path(knowledge_dir)
+    _app_state["reports_dir"] = _resolve_project_path(reports_dir)
+    _app_state["memory_dir"] = _resolve_project_path(memory_dir)
+    _app_state["project_root"] = str(project_root_path)
 
     # 注册路由
     from DataCode.web_routes.patients import router as patients_router
@@ -226,12 +246,16 @@ def create_app(
     # 同步初始化 SkillExecutor（不依赖 startup 事件，避免 --reload 进程隔离问题）
     # 但如果外部（如 main.py）已初始化过，则跳过
     if "skill_executor" not in _app_state:
-        _init_skill_executor(project_root)
+        _init_skill_executor(
+            str(project_root_path),
+            skills_dir=_app_state["skills_dir"],
+            knowledge_dir=_app_state["knowledge_dir"],
+        )
 
-    frontend_dist = Path(project_root) / "frontend_static"
+    frontend_dist = project_root_path / "frontend_static"
     if not frontend_dist.exists():
         # 兼容旧 React 构建产物作为后备
-        frontend_dist = Path(project_root) / "frontend" / "dist"
+        frontend_dist = project_root_path / "frontend" / "dist"
     if frontend_dist.exists():
         app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 

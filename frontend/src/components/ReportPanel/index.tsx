@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Tooltip, message } from 'antd'
 import { usePatientStore, useReportStore, useEditStore, useChatStore } from '../../store'
 import { fetchReport, saveReport } from '../../services/api'
@@ -24,6 +24,31 @@ function EditIcon() {
   )
 }
 
+function sanitizeReportMarkdown(content: string): string {
+  if (!content) return ''
+  const lines = content.replace(/\r\n/g, '\n').split('\n')
+  const cleaned: string[] = []
+  const structuredHeading = /^(?:#{1,6}\s*)?(?:[一二三四五六七八九十]+[、.．]\s*)?(?:完整结构化输出|合并输出JSON|结构化输出|JSON\s*输出)\s*$/i
+  for (const line of lines) {
+    const stripped = line.trim()
+    if (structuredHeading.test(stripped)) break
+    if (/^```json\b/i.test(stripped)) break
+    if (/^```\s*$/.test(stripped)) continue
+    if (
+      stripped.includes('合并输出JSON') ||
+      stripped.includes('【当前步骤上下文') ||
+      stripped.includes('各子Skill输出文件')
+    ) {
+      break
+    }
+    if (/^所有\d*个?子Skill执行完毕/.test(stripped)) continue
+    if (/^所有阶段已完成/.test(stripped)) continue
+    if (/^现在让我整合/.test(stripped)) continue
+    cleaned.push(line)
+  }
+  return cleaned.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 export default function ReportPanel() {
   const selectedId = usePatientStore((s) => s.selectedId)
   const tabs = useReportStore((s) => s.tabs)
@@ -39,13 +64,31 @@ export default function ReportPanel() {
   const editFormData = useEditStore((s) => s.formData)
   const isStreaming = useChatStore((s) => s.isStreaming)
   const { generateReport } = useChat(selectedId)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportLoadError, setReportLoadError] = useState('')
 
   useEffect(() => {
+    let cancelled = false
     clearTabs()
+    setReportLoadError('')
     if (selectedId) {
+      setReportLoading(true)
       fetchReport(selectedId)
-        .then((data) => setReportData(data))
-        .catch((err) => console.warn('Failed to load report:', err))
+        .then((data) => {
+          if (!cancelled) setReportData(data)
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            console.warn('Failed to load report:', err)
+            setReportLoadError('报告加载失败，请稍后重试')
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setReportLoading(false)
+        })
+    }
+    return () => {
+      cancelled = true
     }
   }, [selectedId, setReportData, clearTabs])
 
@@ -64,24 +107,25 @@ export default function ReportPanel() {
 
   const STRUCTURED_KEYS: Partial<Record<TabName, string[]>> = {
     'patient-history': [
-      'visit_count', 'present_illness', 'past_history', 'allergy_history', 'personal_history', 'family_history',
-      '现病史', '既往史', '过敏史', '个人史', '家族史',
+      'visit_count', 'present_illness', 'past_history', 'allergy_history', 'personal_history',
+      'family_history', 'treatment_history', 'patient_info', 'lesion_numbering',
     ],
     'patient-overview': [
-      'chief_complaint', 'physical_examination', 'diagnosis',
-      '主诉', '体格检查', '诊断', '肿瘤负荷', 'ECOG',
+      'chief_complaint', 'physical_examination', 'auxiliary_examination', 'diagnosis',
+      'ai_tumor_burden', 'ai_efficacy', 'ai_adverse_events', 'ai_comorbidity',
+      'ecog_score', 'chronic_management_triangle', 'supplemental_tests',
     ],
     'treatment-plan': [
       'treatment_plans', 'adverse_reaction_plan', 'comorbidity_plan',
-      '治疗方案', '决策路径', '指南匹配',
+      'clinical_trials', 'decision_path', 'drug_classification',
     ],
     'efficacy-prediction': [
       'tumor_prediction', 'adverse_prediction', 'prognosis',
-      '疗效预测', '预后', 'ORR', 'PFS', 'OS',
+      'adaptive_prediction_summary', 'adaptive_monitoring_plan', 'prognostic_factors',
     ],
     'suggestions': [
       'psychological_care', 'health_measures', 'tcm_suggestions',
-      '心理关怀', '健康措施', '中医建议', '护理', '随访',
+      'nursing_care', 'follow_up_plan', 'ai_recommendations', 'patient_education',
     ],
   }
 
@@ -109,7 +153,10 @@ export default function ReportPanel() {
     return normalized
   }
 
-  /** 渲染 Tab 内容：优先结构化(含图表)，次选 Markdown，最后 JSON 回退 */
+  /** 渲染 Tab 内容：优先结构化(含图表)，次选 Markdown，最后 JSON 回退。
+   *  与 old_MedAgent 保持一致的渲染策略：有结构化字段 → FigmaReportCard + ECharts；
+   *  无结构化字段 → Markdown 纯文本。
+   */
   function renderTabContent(
     tab: TabName,
     StructuredComponent: React.ComponentType<any>,
@@ -121,30 +168,45 @@ export default function ReportPanel() {
     const raw = data as Record<string, unknown>
     const record = normalizeTabData(raw)
 
-    // 后端常见包装：{"step": "...", "result": "...", "_content": "..."}。
-    // 这不代表生成失败，优先按 Markdown 正常展示。
-    if ('step' in record && ('result' in record || '_content' in record) && Object.keys(record).length <= 5) {
-      const wrappedContent = String(record._content || record.result || '')
-      return (
-        <div className="report-tab-content">
-          <MarkdownRenderer content={wrappedContent || '本页签已完成，但暂无可展示内容。'} />
-        </div>
-      )
+    // 尝试从 wrapper 对象（{step, result, _content}）中提取结构化数据
+    // 将 result 字段作为 JSON 尝试解析，如果成功则合并到 record 中以供结构化检测
+    const enhanceFromWrapper = () => {
+      const toTry = [record.result, record._content]
+      for (const val of toTry) {
+        if (typeof val !== 'string') continue
+        const trimmed = val.trim()
+        if (trimmed.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(trimmed)
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              Object.assign(record, normalizeTabData(parsed))
+            }
+          } catch { /* not JSON */ }
+        }
+      }
+    }
+    // 仅当数据看起来是后端包装对象时才尝试提取
+    if ('step' in record && Object.keys(record).length <= 5) {
+      enhanceFromWrapper()
     }
 
-    // 1) 结构化渲染：有特征字段就用组件（含 ECharts 图表）
+    // 1) 结构化渲染：有特征字段就用组件（含 ECharts 图表、FigmaReportCard）
     const keyFields = (STRUCTURED_KEYS[tab] || []).filter(k => !/[一-鿿]/.test(k))
     const hasStructured = keyFields.some(k => k in record)
     if (hasStructured) {
       try {
-        // _content 包含原始 JSON 时不需要追加（LLM 输出中已有结构化字段）
-        const mdAppendix: string = String(record._content || record.content || '')
+        // _content 作为额外 Markdown 附录追加（当它包含结构化组件无法展示的信息时）
+        const mdAppendix: string = sanitizeReportMarkdown(String(record._content || record.content || ''))
         const isRawJson = mdAppendix.trim().startsWith('{') || mdAppendix.trim().startsWith('[{')
-        const showAppendix = mdAppendix.length >= 50 && !isRawJson && !keyFields.some(k => {
-          const v = record[k]
-          return (typeof v === 'string' && v.length > mdAppendix.length * 0.4) ||
-                 (typeof v === 'object' && v !== null && !Array.isArray(v))
-        })
+        const structuredText = keyFields
+          .map((k) => record[k])
+          .filter(Boolean)
+          .map((v) => typeof v === 'string' ? v : JSON.stringify(v))
+          .join('\n')
+        const appendixPreview = mdAppendix.trim().slice(0, 160)
+        const showAppendix = mdAppendix.length >= 50 && !isRawJson && (
+          !structuredText || !structuredText.includes(appendixPreview)
+        )
         return (
           <>
             <StructuredComponent data={record} />
@@ -160,8 +222,8 @@ export default function ReportPanel() {
       }
     }
 
-    // 2) Markdown 回退（仅当 _content 不是原始 JSON 时才渲染）
-    const mdContent: string = String(record._content || record.content || record.result || '')
+    // 2) Markdown 回退（仅当内容是 Markdown 文本时才渲染）
+    const mdContent: string = sanitizeReportMarkdown(String(record._content || record.content || record.result || ''))
     const isRawJson = mdContent.trim().startsWith('{') || mdContent.trim().startsWith('[{')
     if (mdContent.length >= 50 && !isRawJson) {
       return (
@@ -172,11 +234,7 @@ export default function ReportPanel() {
     }
 
     // 3) JSON 兜底
-    return (
-      <div className="report-tab-content">
-        <MarkdownRenderer content={'```json\n' + JSON.stringify(record, null, 2) + '\n```'} />
-      </div>
-    )
+    return <div className="empty-state">暂无可展示的报告正文</div>
   }
 
   const dataForTab = (tab: TabName) => {
@@ -236,8 +294,12 @@ export default function ReportPanel() {
         </div>
       </div>
       <div className="report-panel__body">
-        {Object.keys(tabs).length === 0 ? (
-          <div className="empty-state">发送消息后 AI 将逐标签页生成报告</div>
+        {reportLoading ? (
+          <div className="empty-state">正在加载报告...</div>
+        ) : reportLoadError ? (
+          <div className="empty-state">{reportLoadError}</div>
+        ) : Object.keys(tabs).length === 0 ? (
+          <div className="empty-state">{isStreaming ? '正在生成报告，完成后将逐标签页展示...' : '发送消息后 AI 将逐标签页生成报告'}</div>
         ) : isEditing && editFormData[activeTab] ? (
           <EditForm tab={activeTab} data={editFormData[activeTab] as unknown as Record<string, unknown>} />
         ) : (

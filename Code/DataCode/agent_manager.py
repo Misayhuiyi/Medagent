@@ -24,6 +24,7 @@ _FILES_PER_FILE_CHARS = 300
 # previous_results 注入系统 prompt 的最大字符数（防止上下文超限）
 # skill_executor 已通过 _build_previous_summary 按需摘要，此上限作为兜底
 _PREV_RESULTS_MAX_CHARS = 5_000
+_PRIOR_REPORTS_MAX_CHARS = 30_000
 # 需要注入患者资料正文的步骤前缀。
 # 01-02 (资料整理+预处理) 需直接读取处理文件内容。
 # 03-04 (循环次数+场景判断) 仅需文件索引做逻辑决策。
@@ -97,6 +98,15 @@ def _truncate_files_text(files_text: str) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def _truncate_prior_reports(prior_reports_text: str) -> str:
+    if len(prior_reports_text) <= _PRIOR_REPORTS_MAX_CHARS:
+        return prior_reports_text
+    return (
+        prior_reports_text[:_PRIOR_REPORTS_MAX_CHARS]
+        + f"\n（既往报告上下文过长，已截断；原长 {len(prior_reports_text)} 字）"
+    )
+
+
 def resolve_sub_skill_path(parent_skill_dir: str, ref_path: str,
                            skills_base_dir: str | None = None) -> str:
     """解析子 Skill 引用路径。
@@ -135,8 +145,8 @@ def resolve_sub_skill_path(parent_skill_dir: str, ref_path: str,
 # - 简单子 Skill（患者检查、文件夹管理等）25 轮足够
 # - 复杂子 Skill（RAG检索、报告格式转换等）保持 60 轮
 # 减少简单子 Agent 的空转迭代，节省总耗时
-_SUB_AGENT_RECURSION_SIMPLE = 25
-_SUB_AGENT_RECURSION_FULL = 60
+_SUB_AGENT_RECURSION_SIMPLE = 15
+_SUB_AGENT_RECURSION_FULL = 35
 _SUB_AGENT_SIMPLE_PREFIXES = (
     "patient-check", "folder-management", "visit-time-categorization",
     "data-type-categorization", "data-verification",
@@ -187,7 +197,7 @@ class AgentManager:
                 model=model,
                 base_url=base_url or None,
                 api_key=api_key or "dummy",
-                temperature=0.7,
+                temperature=self._config.get("llm.temperature", 0.7) if hasattr(self, '_config') else 0.7,
                 default_headers={"User-Agent": "curl/8.17.0"},
             )
         return self._llm_cache[key]
@@ -205,6 +215,7 @@ class AgentManager:
             tools=tools,
             base_url=self._config.get("llm.base_url", ""),
             api_key=self._config.get("llm.api_key", ""),
+            temperature=self._config.get("llm.temperature", 0.7),
             logger=self._logger,
             agent_name="main",
             parallel_tool_calls=self._parallel_tool_calls,
@@ -231,6 +242,7 @@ class AgentManager:
                 tools=tools,
                 base_url=self._config.get("llm.base_url", ""),
                 api_key=self._config.get("llm.api_key", ""),
+                temperature=self._config.get("llm.temperature", 0.7),
                 logger=self._logger,
                 agent_name=name,
                 parallel_tool_calls=self._parallel_tool_calls,
@@ -254,6 +266,7 @@ class AgentManager:
             tools=[],
             base_url=self._config.get("llm.base_url", ""),
             api_key=self._config.get("llm.api_key", ""),
+            temperature=self._config.get("llm.temperature", 0.7),
             parallel_tool_calls=self._parallel_tool_calls,
         )
         self._agents[name] = {"agent": agent, "config": None, "status": "active"}
@@ -297,18 +310,26 @@ class AgentManager:
         # 系统提示仅保留 SKILL.md（~4KB），files/knowledge 仅发送一次即驻留对话上下文。
         files_text = (args or {}).get("files", "")
         knowledge_text = (args or {}).get("knowledge", "")
+        prior_reports_text = (args or {}).get("prior_reports", "")
         context_parts = []
         if files_text:
             if any(skill.name.startswith(p) for p in _FILES_INJECT_STEP_PREFIXES):
                 context_parts.append(f"【患者资料】\n{_truncate_files_text(files_text)}")
             else:
                 context_parts.append(f"【文件索引·按需读取】\n{_build_file_index(files_text)}")
+        if prior_reports_text:
+            context_parts.append(
+                "【既往报告（纵向背景，仅用于连续性对比）】\n"
+                "要求：当前报告仍以本次就诊资料为主；既往报告用于识别变化、疗效趋势、毒副反应延续性，"
+                "不得把既往事件误写成本次新发生。\n"
+                f"{_truncate_prior_reports(str(prior_reports_text))}"
+            )
         if knowledge_text:
             context_parts.append(f"【知识库参考】\n{knowledge_text[:10000]}")
         context_block = "\n\n".join(context_parts)
 
         # 用户消息：context + 步骤指令（files/knowledge 仍在 args 中但不单独传入 user_args）
-        user_args = {k: v for k, v in (args or {}).items() if k not in ("files", "knowledge")}
+        user_args = {k: v for k, v in (args or {}).items() if k not in ("files", "knowledge", "prior_reports")}
         # 截断 previous_results 防止上下文超限。
         # skill_executor 已通过 _build_previous_summary 按需摘要（保留内容字段），
         # 此处在超限时仅做字节截断，不再丢失内容。

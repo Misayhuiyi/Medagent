@@ -335,3 +335,16 @@ export const ASSESSMENT_COLORS: Record<string, AssessmentColor> = {
   adverse: { border: '#ff3b30', bg: '#fff5f3', label: '不良反应' },
   other: { border: '#8e8e93', bg: '#f5f5f7', label: 'ECOG/其他' },
 }
+
+// ── 语义高亮 ──
+
+export interface SemanticHighlight {
+  text: string
+  color: 'red' | 'blue' | 'green'
+  reason?: string
+  confidence?: number
+}
+
+export interface SemanticHighlightCarrier {
+  _semantic_highlights?: SemanticHighlight[]
+}

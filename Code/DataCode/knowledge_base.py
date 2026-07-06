@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import importlib.util
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Protocol, TypedDict, runtime_checkable
@@ -24,7 +27,7 @@ class EvidenceLevel:
     EXPERT_OPINION = (0, "个人专家意见")
 
 
-class KnowledgeResult(TypedDict):
+class KnowledgeResult(TypedDict, total=False):
     content: str
     source: str
     evidence_level: int
@@ -32,6 +35,15 @@ class KnowledgeResult(TypedDict):
     publish_date: str
     effective_date: str
     guideline_edition: str
+    source_file: str
+    chunk_index: str
+    source_page: str
+    section: str
+    score: float
+    rerank_score: float
+    vector_score: float
+    recommendation_grade: str
+    retrieval_paths: list[str]
 
 
 @runtime_checkable
@@ -65,10 +77,34 @@ class RagKnowledgeBase:
     def _ensure_init(self):
         if self._initialized:
             return
-        # 延迟导入，避免启动时加载重型依赖
+        # 延迟按绝对路径导入，避免 Data/knowledge_base 与 data/knowledge_base
+        # 同时存在时误导入另一个 tool.py。
         try:
-            from tool import search_guidelines
-            self._search_fn = search_guidelines
+            tool_path = (self._kb_dir / "tool.py").resolve()
+            if not tool_path.exists():
+                raise FileNotFoundError(f"knowledge tool not found: {tool_path}")
+            module_name = "medagent_kb_tool_" + hashlib.sha1(str(tool_path).encode("utf-8")).hexdigest()[:12]
+            module = sys.modules.get(module_name)
+            if module is None:
+                spec = importlib.util.spec_from_file_location(module_name, tool_path)
+                if spec is None or spec.loader is None:
+                    raise ImportError(f"cannot load knowledge tool: {tool_path}")
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                kb_path = str(self._kb_dir.resolve())
+                inserted = False
+                if kb_path not in sys.path:
+                    sys.path.insert(0, kb_path)
+                    inserted = True
+                try:
+                    spec.loader.exec_module(module)
+                finally:
+                    if inserted:
+                        try:
+                            sys.path.remove(kb_path)
+                        except ValueError:
+                            pass
+            self._search_fn = getattr(module, "search_guidelines")
             self._initialized = True
         except Exception as e:
             logger.error("RAG knowledge base init failed: %s", e)
@@ -86,37 +122,86 @@ class RagKnowledgeBase:
         if cache_key in self._query_cache:
             self._cache_hits += 1
             logger.debug("KB cache HIT (total hits=%d)", self._cache_hits)
-            return self._query_cache[cache_key]
+            return [KnowledgeResult(**dict(item)) for item in self._query_cache[cache_key]]
 
         self._cache_misses += 1
         self._ensure_init()
         try:
             raw_results = await asyncio.to_thread(
-                self._search_fn, question, top_k, raw=True
+                lambda: self._search_fn(
+                    question=question,
+                    top_k=top_k,
+                    evidence_min=min_evidence or None,
+                    raw=True,
+                )
             )
         except Exception as e:
             logger.exception("RAG search failed for: %s", question[:100])
             return []
 
         results: list[KnowledgeResult] = []
+        cutoff_year = self._cutoff_year(before_date)
         for item in raw_results:
             content = item.get("content", "")
             source = item.get("source", "")
-            year = str(item.get("publish_date", ""))
+            year = self._year_from_item(item)
+            if cutoff_year and year and year.isdigit() and year > cutoff_year:
+                continue
             evidence_level = self._map_evidence(source)
+            evidence_label = (
+                item.get("evidence_label")
+                or item.get("evidence_rank_label")
+                or item.get("evidence_level")
+                or self._evidence_label_for(evidence_level)
+            )
             results.append(KnowledgeResult(
                 content=content[:2000],
                 source=source,
                 evidence_level=evidence_level,
-                evidence_label=self._evidence_label_for(evidence_level),
+                evidence_label=str(evidence_label),
                 publish_date=year,
                 effective_date=year,
-                guideline_edition=item.get("guideline_edition", ""),
+                guideline_edition=str(item.get("guideline_edition") or year),
+                source_file=str(item.get("source_file") or item.get("file") or ""),
+                chunk_index=self._chunk_index_from_item(item),
+                source_page=str(item.get("source_page") or item.get("page") or ""),
+                section=str(item.get("section") or item.get("section_title") or ""),
+                score=float(item.get("score") or item.get("search_score") or 0),
+                rerank_score=float(item.get("rerank_score") or 0),
+                vector_score=float(item.get("vector_score") or 0),
+                recommendation_grade=str(item.get("recommendation_grade") or ""),
+                retrieval_paths=list(item.get("retrieval_paths") or []),
             ))
         results = results[:top_k]
         # 写入缓存
-        self._query_cache[cache_key] = results
-        return results
+        self._query_cache[cache_key] = [KnowledgeResult(**dict(item)) for item in results]
+        return [KnowledgeResult(**dict(item)) for item in results]
+
+    @staticmethod
+    def _cutoff_year(before_date: str | None) -> str:
+        if not before_date:
+            return ""
+        match = re.search(r"(20\d{2}|19\d{2})", str(before_date))
+        return match.group(1) if match else ""
+
+    @staticmethod
+    def _year_from_item(item: dict) -> str:
+        value = item.get("publish_date") or item.get("year") or item.get("effective_date") or ""
+        if isinstance(value, int):
+            return str(value)
+        match = re.search(r"(20\d{2}|19\d{2})", str(value))
+        return match.group(1) if match else str(value)
+
+    @staticmethod
+    def _chunk_index_from_item(item: dict) -> str:
+        value = item.get("chunk_index")
+        if value is not None and value != "":
+            return str(value)
+        position = str(item.get("position") or "")
+        match = re.search(r"第\s*(\d+)\s*/", position)
+        if match:
+            return match.group(1)
+        return position
 
     _evidence_mapping: dict | None = None
 
@@ -127,11 +212,21 @@ class RagKnowledgeBase:
             return cls._evidence_mapping
         import yaml
         from pathlib import Path
-        platform_path = Path(__file__).resolve().parent.parent.parent / "data" / "platform.yaml"
+        project_root = Path(__file__).resolve().parent.parent.parent
+        candidate_paths = [
+            project_root / "Data" / "platform.yaml",
+            project_root / "data" / "platform.yaml",
+        ]
         try:
-            with open(platform_path, encoding="utf-8") as f:
-                platform = yaml.safe_load(f) or {}
-            cls._evidence_mapping = platform.get("evidence_mapping", {})
+            for platform_path in candidate_paths:
+                if not platform_path.exists():
+                    continue
+                with open(platform_path, encoding="utf-8") as f:
+                    platform = yaml.safe_load(f) or {}
+                cls._evidence_mapping = platform.get("evidence_mapping", {}) or {}
+                break
+            else:
+                cls._evidence_mapping = {}
         except Exception:
             cls._evidence_mapping = {}
         return cls._evidence_mapping
@@ -151,6 +246,14 @@ class RagKnowledgeBase:
                 return EvidenceLevel.NATIONAL_GUIDELINE[0]
             if label == "international_consensus":
                 return EvidenceLevel.INTERNATIONAL_CONSENSUS[0]
+            if label == "national_consensus":
+                return EvidenceLevel.NATIONAL_CONSENSUS[0]
+        if "NCCN" in source.upper() or "ASCO" in source.upper() or "ESMO" in source.upper():
+            return EvidenceLevel.INTERNATIONAL_GUIDELINE[0]
+        if "CSCO" in source.upper() or "CACA" in source.upper():
+            return EvidenceLevel.NATIONAL_GUIDELINE[0]
+        if "SITC" in source.upper() or "CTCAE" in source.upper():
+            return EvidenceLevel.INTERNATIONAL_CONSENSUS[0]
         return EvidenceLevel.EXPERT_OPINION[0]
 
     @classmethod
@@ -180,5 +283,3 @@ class RagKnowledgeBase:
             logger.info("KB warmup complete (cache misses=%d)", self._cache_misses)
         except Exception as e:
             logger.warning("KB warmup failed (non-fatal): %s", e)
-
-

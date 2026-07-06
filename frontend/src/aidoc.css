@@ -1322,9 +1322,6 @@ textarea {
 .app-shell.aidoc-v2 .figma-card__trace:hover {
   text-decoration: underline;
 }
-  text-decoration: underline;
-  cursor: pointer;
-}
 
 .app-shell.aidoc-v2 .figma-card__level {
   min-width: 40px;
@@ -1422,7 +1419,7 @@ textarea {
 }
 
 .app-shell.aidoc-v2 .report-chart {
-  height: 200px !important;
+  height: 250px !important;
   margin: 8px 0;
 }
 
@@ -1784,3 +1781,103 @@ textarea {
   word-break: break-word;
 }
 
+/* ── Clinical Text (semantic highlighting) ── */
+.app-shell.aidoc-v2 .clinical-text {
+  color: var(--aidoc-text);
+  font-size: 15px;
+  line-height: 1.72;
+  text-align: left;
+}
+.app-shell.aidoc-v2 .clinical-text p {
+  margin: 0 0 8px;
+}
+.app-shell.aidoc-v2 .clinical-text p:last-child {
+  margin-bottom: 0;
+}
+.app-shell.aidoc-v2 .clinical-text--compact {
+  font-size: 14px;
+  line-height: 1.62;
+}
+.app-shell.aidoc-v2 .clinical-mark {
+  padding: 0 1px;
+  border-radius: 0;
+  background: transparent;
+  font-weight: 600;
+}
+.app-shell.aidoc-v2 .clinical-mark--red { color: #c8271f; }
+.app-shell.aidoc-v2 .clinical-mark--blue { color: #095db7; }
+.app-shell.aidoc-v2 .clinical-mark--green { color: #12733a; }
+
+/* ── Triangle Dimension Row ── */
+.app-shell.aidoc-v2 .triangle-dimension-row {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.app-shell.aidoc-v2 .triangle-dimension-row:last-child {
+  border-bottom: none;
+}
+.app-shell.aidoc-v2 .triangle-dimension-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: baseline;
+  color: var(--aidoc-text-strong);
+  font-size: 14px;
+  line-height: 24px;
+}
+.app-shell.aidoc-v2 .triangle-dimension-row__head span {
+  color: var(--aidoc-text-secondary);
+  font-size: 13px;
+}
+
+/* ── Treatment Plan Toggle ── */
+.app-shell.aidoc-v2 .treatment-plan-card.is-collapsed .treatment-plan-card__body {
+  display: none;
+}
+.app-shell.aidoc-v2 .treatment-plan-toggle {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: transparent;
+  color: var(--aidoc-text-secondary);
+  cursor: pointer;
+}
+.app-shell.aidoc-v2 .treatment-plan-toggle svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s;
+}
+.app-shell.aidoc-v2 .treatment-plan-card.is-collapsed .treatment-plan-toggle svg {
+  transform: rotate(-90deg);
+}
+
+/* ── Workspace Empty State ── */
+.app-shell.aidoc-v2 .workspace-empty-state {
+  padding: 24px;
+  border-left: 1px solid var(--aidoc-border);
+  background: #fff;
+  text-align: center;
+}
+.app-shell.aidoc-v2 .workspace-empty-state__title {
+  color: var(--aidoc-text);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.app-shell.aidoc-v2 .workspace-empty-state__desc {
+  margin-top: 8px;
+  color: var(--aidoc-text-muted);
+  font-size: 13px;
+  line-height: 20px;
+}

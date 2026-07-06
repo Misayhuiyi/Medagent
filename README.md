@@ -259,7 +259,7 @@ llm:
   base_url: "https://api.deepseek.com/v1"
   api_key: "sk-your-api-key"
   default_model: "deepseek-v4-flash"
-  temperature: 0.7
+  temperature: 0            # 医疗场景需确定性输出
   context_length: 200000
   parallel_tool_calls: true
 

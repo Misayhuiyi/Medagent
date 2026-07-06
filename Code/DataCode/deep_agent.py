@@ -38,6 +38,7 @@ def create_deep_agent(
     tools: list,
     base_url: str = "",
     api_key: str = "",
+    temperature: float = 0.7,
     mode: str = "autonomous",
     logger: ExecutionLogger | None = None,
     agent_name: str = "",
@@ -53,6 +54,7 @@ def create_deep_agent(
         tools: 可用工具列表（langchain Tool 对象）。
         base_url: LLM API 基础 URL。
         api_key: LLM API 密钥。
+        temperature: LLM 生成温度，0=确定性输出。默认 0.7，医疗场景建议设为 0。
         mode: 执行模式 — "autonomous"（标准 ReAct）或 "sequential"（步骤链）。
         logger: 可选 ExecutionLogger，记录执行过程。
         agent_name: Agent 名称，用于日志。
@@ -70,7 +72,7 @@ def create_deep_agent(
             model=model,
             base_url=base_url or None,
             api_key=api_key or "dummy",
-            temperature=0.7,
+            temperature=temperature,
             default_headers={"User-Agent": "curl/8.17.0"},
         )
     # LLMCallbackHandler 通过 agent.ainvoke(config={"callbacks": [...]}) 传入，

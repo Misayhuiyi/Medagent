@@ -36,7 +36,9 @@ def _format_trace_results(raw: list) -> list[dict]:
         results.append({
             "source": r.get("source", ""),
             "content": content[:500],
-            "page": r.get("page", ""),
+            "page": r.get("page") or r.get("source_page", ""),
+            "source_file": r.get("source_file", ""),
+            "section": r.get("section", ""),
             "evidence_level": r.get("evidence_level", 0),
             "year": r.get("publish_date", ""),
         })

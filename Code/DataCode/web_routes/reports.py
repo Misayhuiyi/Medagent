@@ -73,6 +73,27 @@ def _download_filename(patient_info: dict, format: str) -> str:
     return f"肺瘤慢病化管理AI门诊报告V4_{safe_name}_{safe_pid}.{ext}"
 
 
+def _sanitize_report_for_display(report: dict) -> dict:
+    """Clean legacy report markdown before returning it to the frontend."""
+    try:
+        from DataCode.skill_executor import SkillExecutor
+    except Exception:
+        return report
+
+    cleaned: dict = {}
+    for tab, value in report.items():
+        if not isinstance(value, dict):
+            cleaned[tab] = value
+            continue
+        item = dict(value)
+        for key in ("_content", "content", "result"):
+            raw = item.get(key)
+            if isinstance(raw, str):
+                item[key] = SkillExecutor._clean_agent_content(raw)
+        cleaned[tab] = item
+    return cleaned
+
+
 @router.get("/{patient_id}")
 async def get_report(patient_id: str):
     """获取最新报告（5 tab JSON）。"""
@@ -80,7 +101,7 @@ async def get_report(patient_id: str):
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return _sanitize_report_for_display(json.loads(path.read_text(encoding="utf-8")))
     except json.JSONDecodeError:
         return {}
 

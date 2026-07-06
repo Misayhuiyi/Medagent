@@ -1,48 +1,11 @@
 import type { CareData } from '../../types'
 import FigmaReportCard from './FigmaReportCard'
+import { formatClinicalValue } from './textFormat'
 
 const TAB = 'suggestions'
 
 function safeText(v: unknown): string {
-  if (!v) return ''
-  if (typeof v === 'string') return v
-  if (typeof v === 'object') {
-    const obj = v as Record<string, unknown>
-    if ('summary' in obj && typeof obj.summary === 'string') return obj.summary as string
-    if ('smoking' in obj || 'alcohol' in obj) {
-      const parts: string[] = []
-      if (obj.smoking && typeof obj.smoking === 'object') {
-        const s = obj.smoking as Record<string, unknown>
-        parts.push(`吸烟：${s.status || ''}${s.packYears ? ' (' + s.packYears + '包年)' : ''}`)
-      }
-      if (obj.alcohol && typeof obj.alcohol === 'object') {
-        const a = obj.alcohol as Record<string, unknown>
-        parts.push(`饮酒：${a.status || ''}`)
-      }
-      if (obj.occupationalExposure && Array.isArray(obj.occupationalExposure)) {
-        const items = obj.occupationalExposure.map((e: unknown) => {
-          if (typeof e === 'object' && e) {
-            const ee = e as Record<string, string>
-            return `${ee.exposure || ''}（${ee.detail || ''}）`
-          }
-          return String(e)
-        })
-        if (items.length) parts.push(`职业暴露：${items.join('；')}`)
-      }
-      return parts.filter(Boolean).join('\n')
-    }
-    if ('details' in obj && Array.isArray(obj.details)) {
-      return obj.details.map((d: unknown) => {
-        if (typeof d === 'object' && d) {
-          const dd = d as Record<string, string>
-          return `${dd.system || ''}：${dd.disease || ''}${dd.notes ? '（' + dd.notes + '）' : ''}`
-        }
-        return String(d)
-      }).filter(Boolean).join('\n')
-    }
-    return JSON.stringify(v, null, 2)
-  }
-  return String(v)
+  return formatClinicalValue(v)
 }
 
 function CareCard({ title, content, evidence }: { title: string; content: unknown; evidence: string }) {

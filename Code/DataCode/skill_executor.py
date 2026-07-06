@@ -60,7 +60,7 @@ _STEP_FILES_BUDGETS: dict[str, tuple[int, int]] = {
 # 步骤 06 (patient-profile) 有 10 个子 Agent + 7 次 RAG 检索，每子 Agent 调用消耗
 # 2-3 轮（tool call + result），加上主 Agent 思考轮次，50 轮可能不足。
 # 提升至 100 以确保复杂 Skill 不会因递归轮次耗尽而失败。
-SKILL_RECURSION_LIMIT = 100
+SKILL_RECURSION_LIMIT = 50
 
 # 按步骤分级的递归上限。
 # platform.yaml parallel_tool_calls=false → 每轮仅 1 个工具调用。
@@ -71,16 +71,16 @@ SKILL_RECURSION_LIMIT = 100
 # 步骤 06 (患者概况，10 子Agent + RAG)：100 轮。
 # 步骤 10 (报告生成组装)：15 轮。
 _STEP_RECURSION_LIMITS: dict[str, int] = {
-    "01-data-organization": 60,  # 升至60：刘海平-004有100份文件，25轮严重不足
-    "02-data-preprocessing": 60,  # 升至60：单次就诊运行时仍频繁耗尽，资料验证+质量报告流程轮次高
-    "03-loop-count-determination": 60,  # 升至60：单次就诊下循环分析+映射关系仍需充足轮次
-    "04-scenario-judgment": 100,  # 升至100：80轮仍反复耗尽，LLM在场景匹配+RAG+验证中频繁空转重试
-    "05-patient-history-summary": 80,   # 升至80：100份文件→5个子Agent并行仍需充足汇总轮次
-    "06-patient-profile": 100,
-    "07-treatment-plan": 80,
-    "08-efficacy-prediction": 80,        # 升至80：100份文件需更多轮次完成预测分析
-    "09-other-suggestions": 80,         # 升至80：100份文件需更多轮次整理建议
-    "10-report-generation": 60,         # 升至60：100份文件的汇总输出
+    "01-data-organization": 20,
+    "02-data-preprocessing": 20,
+    "03-loop-count-determination": 40,
+    "04-scenario-judgment": 40,
+    "05-patient-history-summary": 40,
+    "06-patient-profile": 50,
+    "07-treatment-plan": 40,
+    "08-efficacy-prediction": 35,
+    "09-other-suggestions": 30,
+    "10-report-generation": 20,
 }
 
 # 不需要知识库注入的轻量预处理步骤。
@@ -180,6 +180,7 @@ _PREV_STEP_DEPS: dict[str, list[str]] = {
 }
 _PREV_SUMMARY_MAX_CHARS = 3000
 _PREV_FIELD_MAX_CHARS = 400  # 单个字段截断上限
+_PRIOR_REPORT_STEP_PREFIXES = ("05-", "06-", "07-", "08-", "09-")
 
 
 def _build_previous_summary(
@@ -380,7 +381,7 @@ class SkillExecutor:
                 + (f" ({edition})" if edition else "")
                 + f" | 证据等级: {r.get('evidence_label', '')}"
                 + f" | 发布: {r.get('publish_date', '')}"
-                + f"\n{r['content'][:500]}"
+                + f"\n{r['content'][:350]}"
             )
         return "\n\n".join(lines)
 
@@ -559,6 +560,11 @@ class SkillExecutor:
             r"^```\s*$",                 # 孤立的代码块标记
         ]
         _LINE_REMOVE_REGEX = _re.compile("|".join(_LINE_REMOVE_PATTERNS))
+        _STRUCTURED_OUTPUT_REGEX = _re.compile(
+            r"^(?:#{1,6}\s*)?(?:[一二三四五六七八九十]+[、.．]\s*)?"
+            r"(?:完整结构化输出|合并输出JSON|结构化输出|JSON\s*输出)\s*$",
+            _re.IGNORECASE,
+        )
 
         # 2. 触发 monologue 块删除的模式（该行及后续非标题行全部移除）
         _AGENT_MONOLOGUE_PATTERNS = [
@@ -580,6 +586,12 @@ class SkillExecutor:
 
         for line in md_text.splitlines():
             stripped = line.strip()
+
+            # 「完整结构化输出」之后通常是给程序消费的 JSON，不应进入前端报告正文。
+            if _STRUCTURED_OUTPUT_REGEX.match(stripped):
+                break
+            if stripped.lower().startswith("```json"):
+                break
 
             # 仅移除该行（不触发块删除）
             if _LINE_REMOVE_REGEX.match(stripped):
@@ -608,6 +620,81 @@ class SkillExecutor:
                 cleaned_lines.append(cleaned)
 
         return "\n".join(cleaned_lines)
+
+    # ── Markdown → 结构化 JSON 提取 ──
+    # 当 LLM 输出为 Markdown 而非 JSON 时，尝试从标题中提取结构化字段。
+    # 匹配逻辑：按 ## 标题拆分 Markdown，将标题文本映射到对应的结构化字段名。
+    _HEADING_TO_FIELD_MAP: dict[str, dict[str, str]] = {
+        "05-patient-history-summary": {
+            "主诉": "chief_complaint", "现病史": "present_illness",
+            "既往史": "past_history", "过敏史": "allergy_history",
+            "个人史": "personal_history", "家族史": "family_history",
+            "治疗史": "treatment_history", "基本信息": "patient_info",
+        },
+        "06-patient-profile": {
+            "主诉": "chief_complaint", "体格检查": "physical_examination",
+            "辅助检查": "auxiliary_examination", "诊断": "diagnosis",
+            "AI 肿瘤负荷": "ai_tumor_burden", "肿瘤负荷": "ai_tumor_burden",
+            "AI 疗效": "ai_efficacy", "疗效评估": "ai_efficacy",
+            "AI 不良反应": "ai_adverse_events", "不良反应": "ai_adverse_events",
+            "合并症": "ai_comorbidity", "ECOG": "ecog_score",
+        },
+        "07-treatment-plan": {
+            "治疗": "treatment_plans", "AI 治疗": "treatment_plans",
+            "不良反应处理": "adverse_reaction_plan", "合并症处理": "comorbidity_plan",
+            "临床": "clinical_trials",
+        },
+        "08-efficacy-prediction": {
+            "肿瘤": "tumor_prediction", "疗效预测": "tumor_prediction",
+            "不良反应预测": "adverse_prediction", "预后": "prognosis",
+        },
+        "09-other-suggestions": {
+            "心理": "psychological_care", "健康": "health_measures",
+            "中医": "tcm_suggestions", "护理": "nursing_care", "随访": "follow_up_plan",
+        },
+    }
+
+    @staticmethod
+    def _extract_structured_from_markdown(markdown_text: str, step_name: str) -> dict | None:
+        """当 LLM 输出为 Markdown 而非 JSON 时，尝试提取结构化字段。
+        返回 None 表示无法提取，调用方应走原有 fallback 逻辑。
+        """
+        import re as _re
+        mapping = SkillExecutor._HEADING_TO_FIELD_MAP.get(step_name)
+        if not mapping:
+            return None
+        if not markdown_text or len(markdown_text) < 100:
+            return None
+
+        result: dict = {"step": step_name, "_content": SkillExecutor._clean_agent_content(markdown_text)}
+        found_any = False
+
+        # 按 ## 标题拆分 Markdown 段落
+        sections = _re.split(r'\n(?=#{1,3}\s+)', markdown_text)
+        for section in sections:
+            m = _re.match(r'^#{1,3}\s+([^\n]+)', section)
+            if not m:
+                continue
+            heading = m.group(1).strip()
+            # 去除标题中的 emoji 和编号前缀
+            clean_heading = _re.sub(r'[^一-鿿\w\s]', '', heading).strip()
+            # 去除编号（一、二、1. 等）
+            clean_heading = _re.sub(r'^[一二三四五六七八九十]+[、.．]?\s*', '', clean_heading)
+            clean_heading = _re.sub(r'^\d+[、.．]?\s*', '', clean_heading)
+
+            # 匹配已知字段
+            for pattern, field_name in mapping.items():
+                if pattern in clean_heading or clean_heading == pattern:
+                    body = section[m.end():].strip()
+                    body = SkillExecutor._clean_agent_content(body)
+                    if body and len(body) > 10:
+                        # 不覆盖已有内容
+                        if field_name not in result or len(body) > len(str(result.get(field_name, ''))):
+                            result[field_name] = body
+                        found_any = True
+                    break
+
+        return result if found_any else None
 
     def reset_disabled_providers(self) -> None:
         self._disabled_providers.clear()
@@ -847,6 +934,9 @@ class SkillExecutor:
         call_id = tracker.start(agent=agent_name, model=model, base_url=base_url,
                                 api_key=api_key, prompt=prompt_text, kind="chat")
 
+        config = getattr(self._agent_manager, "_config", None)
+        chat_temp = config.get("llm.chat_temperature", config.get("llm.temperature", 0.7)) if config else 0.7
+
         client = AsyncOpenAI(
             api_key=api_key or "dummy",
             base_url=base_url or None,
@@ -855,7 +945,7 @@ class SkillExecutor:
 
         async def _do_stream() -> AsyncIterator[dict]:
             stream = await client.chat.completions.create(
-                model=model, messages=messages, temperature=0.4, stream=True,
+                model=model, messages=messages, temperature=chat_temp, stream=True,
             )
             async for ev in stream:
                 if not ev.choices:
@@ -895,6 +985,8 @@ class SkillExecutor:
         files: list[dict],
         message: str,
         visit_date: str,
+        prior_reports: str = "",
+        patient_dir: str = "",
     ) -> AsyncIterator[dict]:
         """执行报告生成流水线（支持 Tab 并行 / Pipeline 串行 两种模式）。"""
         self.reset_disabled_providers()
@@ -930,11 +1022,13 @@ class SkillExecutor:
                 )
 
         # KB 查询
+        knowledge_results: list[dict] = []
         kb_query = " ".join(
             kw for step in steps for kw in step.keywords[:3]
         ) or "诊疗 指南 评估"
         try:
-            knowledge_results = await self._kb.query(question=kb_query, top_k=15, before_date=visit_date)
+            kb_top_k = max(3, min(15, int(os.environ.get("MEDAGENT_KB_TOP_K", "8"))))
+            knowledge_results = await self._kb.query(question=kb_query, top_k=kb_top_k, before_date=visit_date)
             knowledge_text = self._format_knowledge(knowledge_results)
             # 缓存到 app_state
             from DataCode.web_server import _app_state
@@ -952,7 +1046,6 @@ class SkillExecutor:
                     scored = _kw_score_cache[kw_key]
                 step_results = [r for r, s in scored if s > 0]
                 cache[f"{patient_id}:{step.name}"] = step_results if step_results else knowledge_results[:2]
-            asyncio.create_task(self._background_clean_cache(patient_id, knowledge_results))
         except Exception as e:
             logger.exception("Knowledge query failed")
             knowledge_text = f"知识库查询失败：{e}"
@@ -1045,6 +1138,7 @@ class SkillExecutor:
                             "knowledge": step_knowledge,
                             "visit_date": visit_date,
                             "previous_results": prev_summary,
+                            "prior_reports": prior_reports if step.name.startswith(_PRIOR_REPORT_STEP_PREFIXES) else "",
                         },
                     )
                     result_json = json.loads(result_text)
@@ -1056,15 +1150,25 @@ class SkillExecutor:
                     fallback_note = f"LLM 调用超过 {LLM_TAB_TIMEOUT_SECONDS} 秒"
                     logger.warning("Step %s timed out", step.name)
                 except json.JSONDecodeError:
-                    # JSON 解析失败时，将原始文本作为 markdown 内容保留
-                    fallback_note = "LLM 输出非有效 JSON（已保留原始文本）"
-                    result_json = {
-                        "step": step.name,
-                        "display_name": step.display_name,
-                        "content": result_text or "",
-                        "status": "markdown",
-                    }
-                    logger.warning("JSON decode failed for step %s, keeping raw markdown (len=%d)", step.name, len(result_text))
+                    # JSON 解析失败，尝试从 Markdown 中提取结构化字段
+                    extracted = self._extract_structured_from_markdown(result_text or "", step.name)
+                    if extracted and len(extracted) > 2:
+                        extracted["_content"] = self._clean_agent_content(
+                            self._json_to_markdown(extracted, step.display_name))
+                        result_json = extracted
+                        fallback_note = None
+                        logger.info("Step %s: extracted %d structured fields from markdown (len=%d)",
+                                    step.name, len(extracted) - 2, len(result_text))
+                    else:
+                        fallback_note = "LLM 输出非有效 JSON（已保留原始文本）"
+                        result_json = {
+                            "step": step.name,
+                            "display_name": step.display_name,
+                            "_content": self._clean_agent_content(result_text or ""),
+                            "result": result_text or "",
+                            "status": "markdown",
+                        }
+                        logger.warning("JSON decode failed for step %s, keeping raw markdown (len=%d)", step.name, len(result_text))
                 except Exception as e:
                     fallback_note = f"LLM {self._classify_llm_error(e)}"
                     # 仅在 LLM 基础设施不可用时才禁用后续步骤：
@@ -1164,11 +1268,77 @@ class SkillExecutor:
                     encoding="utf-8",
                 )
                 logger.info("Report saved: %s (%d tabs)", report_file, len(report_for_save))
+                self._write_generated_report_context(
+                    patient_id=patient_id,
+                    report=report_for_save,
+                    visit_date=visit_date,
+                    patient_dir=patient_dir or str(_Path(_res_app_state.get("patients_dir", "TempData/patients")) / patient_id),
+                )
             except Exception:
                 logger.exception("Failed to save report for %s", patient_id)
 
+        if knowledge_results and os.environ.get("MEDAGENT_CLEAN_KB_CACHE", "").lower() in ("1", "true", "yes"):
+            asyncio.create_task(self._background_clean_cache(patient_id, knowledge_results))
+
         event_id += 1
         yield {"id": event_id, "event": "done", "data": {}}
+
+    @staticmethod
+    def _write_generated_report_context(
+        patient_id: str,
+        report: dict[str, object],
+        visit_date: str,
+        patient_dir: str,
+    ) -> None:
+        """Persist the current report as prior context for later timepoints."""
+
+        if not visit_date or len(visit_date) != 10:
+            logger.info("Skip prior-context archive for %s: invalid visit_date=%s", patient_id, visit_date)
+            return
+        try:
+            from pathlib import Path as _Path
+            from DataCode.report_context import (
+                generated_report_bucket_date,
+                report_to_prior_json,
+                write_generated_report_json,
+                write_generated_report_markdown,
+            )
+            from DataCode.report_generator import REPORT_TITLE, report_to_markdown
+
+            pdir = _Path(patient_dir)
+            patient_name = patient_id.rsplit("-", 1)[0] if "-" in patient_id else patient_id
+            patient_info = {
+                "id": patient_id,
+                "patient_id": patient_id,
+                "name": patient_name,
+                "visit_date": visit_date,
+                "date": visit_date,
+            }
+            markdown = report_to_markdown(report, REPORT_TITLE, patient_info)
+            md_path = write_generated_report_markdown(
+                pdir,
+                visit_date,
+                markdown,
+                patient_name=patient_name,
+                patient_id=patient_id,
+            )
+            bucket_date = generated_report_bucket_date(pdir, visit_date)
+            prior_json = report_to_prior_json(
+                report,
+                source_date=visit_date,
+                bucket_date=bucket_date,
+                encounter_type="selected",
+            )
+            json_path = write_generated_report_json(
+                pdir,
+                visit_date,
+                prior_json,
+                patient_name=patient_name,
+                patient_id=patient_id,
+            )
+            logger.info("Generated report context archived: md=%s json=%s", md_path, json_path)
+        except Exception:
+            logger.exception("Failed to archive generated report context for %s", patient_id)
 
     @staticmethod
     async def _background_clean_cache(patient_id: str, knowledge_results: list[dict]) -> None:

@@ -14,6 +14,7 @@ function inferRequestedMode(content: string, mode: 'chat' | 'report' | 'auto'): 
 export function useChat(patientId: string | null) {
   const abortRef = useRef<AbortController | null>(null)
   const modeRef = useRef<'chat' | 'report'>('chat')
+  const streamSeqRef = useRef(0)
 
   const addMessage = useChatStore((s) => s.addMessage)
   const appendToLastMessage = useChatStore((s) => s.appendToLastMessage)
@@ -43,6 +44,8 @@ export function useChat(patientId: string | null) {
 
     const controller = new AbortController()
     abortRef.current = controller
+    const streamSeq = streamSeqRef.current + 1
+    streamSeqRef.current = streamSeq
 
     addMessage({ role: 'user', content, timestamp: new Date().toISOString() })
     modeRef.current = inferRequestedMode(content, mode)
@@ -80,18 +83,19 @@ export function useChat(patientId: string | null) {
         buffer = remaining
 
         for (const event of events) {
-          handleEvent(event)
+          handleEvent(event, streamSeq)
         }
       }
 
       if (buffer.trim()) {
         const { events } = parseSSE(buffer + '\n\n')
         for (const event of events) {
-          handleEvent(event)
+          handleEvent(event, streamSeq)
         }
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return
+      if (streamSeqRef.current !== streamSeq) return
       try { controller.abort() } catch { /* already aborted */ }
       console.error('SSE error:', err)
       addMessage({
@@ -100,12 +104,15 @@ export function useChat(patientId: string | null) {
         timestamp: new Date().toISOString(),
       })
     } finally {
-      setStreaming(false)
-      abortRef.current = null
+      if (streamSeqRef.current === streamSeq) {
+        setStreaming(false)
+        abortRef.current = null
+      }
     }
   }, [patientId, abort, addMessage, setStreaming, setLastEventId])
 
-  function handleEvent(event: SSEEvent) {
+  function handleEvent(event: SSEEvent, streamSeq: number) {
+    if (streamSeqRef.current !== streamSeq) return
     if (event.id) setLastEventId(event.id)
 
     switch (event.type) {

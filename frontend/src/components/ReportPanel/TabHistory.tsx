@@ -1,6 +1,7 @@
 import ReactECharts from 'echarts-for-react'
 import type { HistoryData, TimelineItem } from '../../types'
 import FigmaReportCard from './FigmaReportCard'
+import { formatClinicalValue } from './textFormat'
 
 const TAB = 'patient-history'
 
@@ -11,47 +12,7 @@ const COLOR_MAP: Record<string, string> = {
 }
 
 function safeText(v: unknown): string {
-  if (!v) return ''
-  if (typeof v === 'string') return v
-  if (typeof v === 'object') {
-    const obj = v as Record<string, unknown>
-    if ('summary' in obj && typeof obj.summary === 'string') return obj.summary as string
-    // 个人史格式：{smoking:{status,packYears}, alcohol:{status}}
-    if ('smoking' in obj || 'alcohol' in obj) {
-      const parts: string[] = []
-      if (obj.smoking && typeof obj.smoking === 'object') {
-        const s = obj.smoking as Record<string, unknown>
-        parts.push(`吸烟：${s.status || ''}${s.packYears ? ' (' + s.packYears + '包年)' : ''}`)
-      }
-      if (obj.alcohol && typeof obj.alcohol === 'object') {
-        const a = obj.alcohol as Record<string, unknown>
-        parts.push(`饮酒：${a.status || ''}`)
-      }
-      if (obj.occupationalExposure && Array.isArray(obj.occupationalExposure)) {
-        const items = obj.occupationalExposure.map((e: unknown) => {
-          if (typeof e === 'object' && e) {
-            const ee = e as Record<string, string>
-            return `${ee.exposure || ''}（${ee.detail || ''}）`
-          }
-          return String(e)
-        })
-        if (items.length) parts.push(`职业暴露：${items.join('；')}`)
-      }
-      return parts.filter(Boolean).join('\n')
-    }
-    // details 数组 → 系统分类列表
-    if ('details' in obj && Array.isArray(obj.details)) {
-      return obj.details.map((d: unknown) => {
-        if (typeof d === 'object' && d) {
-          const dd = d as Record<string, string>
-          return `${dd.system || ''}：${dd.disease || ''}${dd.notes ? '（' + dd.notes + '）' : ''}`
-        }
-        return String(d)
-      }).filter(Boolean).join('\n')
-    }
-    return JSON.stringify(v, null, 2)
-  }
-  return String(v)
+  return formatClinicalValue(v)
 }
 
 function HistoryTextCard({ title, content, evidence }: { title: string; content: unknown; evidence: string }) {
@@ -77,6 +38,39 @@ function normalizeTimeline(timeline: unknown): TimelineItem[] {
       type: String(raw.type || raw.stage || ''),
     }
   })
+}
+
+function normalizeTumorSizeChart(raw: unknown): { labels: string[]; values: number[] } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const data = raw as Record<string, unknown>
+  const labels = Array.isArray(data.labels) ? data.labels.map(String) :
+    Array.isArray(data.dates) ? data.dates.map(String) :
+    Array.isArray(data.xAxis) ? data.xAxis.map(String) : []
+  const valuesRaw = Array.isArray(data.values) ? data.values :
+    Array.isArray(data.sizes) ? data.sizes :
+    Array.isArray(data.yAxis) ? data.yAxis : []
+  const values = valuesRaw.map((v) => Number(v)).filter((v) => Number.isFinite(v))
+  if (labels.length && values.length === labels.length) return { labels, values }
+
+  const points = Array.isArray(data.points) ? data.points : Array.isArray(data.data) ? data.data : []
+  if (Array.isArray(points) && points.length) {
+    const pointLabels: string[] = []
+    const pointValues: number[] = []
+    points.forEach((item) => {
+      if (!item || typeof item !== 'object') return
+      const p = item as Record<string, unknown>
+      const label = String(p.date || p.time || p.label || '')
+      const value = Number(p.value ?? p.size ?? p.diameter ?? p.long_diameter)
+      if (label && Number.isFinite(value)) {
+        pointLabels.push(label)
+        pointValues.push(value)
+      }
+    })
+    if (pointLabels.length && pointLabels.length === pointValues.length) {
+      return { labels: pointLabels, values: pointValues }
+    }
+  }
+  return null
 }
 
 function TimelineView({ timeline }: { timeline: TimelineItem[] }) {
@@ -130,6 +124,14 @@ function TumorSizeChart({ data }: { data: { labels: string[]; values: number[] }
 
 export default function TabHistory({ data }: { data?: HistoryData }) {
   if (!data) return <div className="empty-state">等待病史分析...</div>
+  const presentIllness = data.present_illness as unknown as Record<string, unknown> | undefined
+  const timeline = normalizeTimeline(presentIllness?.timeline || (data as unknown as Record<string, unknown>).timeline)
+  const tumorChart = normalizeTumorSizeChart(
+    presentIllness?.tumor_size_chart ||
+    presentIllness?.tumorSizeChart ||
+    (data as unknown as Record<string, unknown>).tumor_size_chart ||
+    (data as unknown as Record<string, unknown>).tumorSizeChart,
+  )
 
   return (
     <div className="report-tab-content history-tab-content">
@@ -137,11 +139,11 @@ export default function TabHistory({ data }: { data?: HistoryData }) {
         <div className="report-stat-value">问诊次数：{typeof data.visit_count === 'number' ? data.visit_count : (typeof data.visit_count === 'object' ? safeText(data.visit_count) : data.visit_count || '未知')} 次</div>
       </FigmaReportCard>
       <FigmaReportCard title="现病史时间线" icon="history" evidence="证据来源：病程记录 + 影像报告 + 治疗记录" tab={TAB}>
-        <TimelineView timeline={normalizeTimeline(data.present_illness?.timeline)} />
+        <TimelineView timeline={timeline} />
       </FigmaReportCard>
-      {data.present_illness?.tumor_size_chart && (
+      {tumorChart && (
         <FigmaReportCard title="肿瘤大小趋势" icon="chart" evidence="证据来源：影像测量记录" tab={TAB}>
-          <TumorSizeChart data={data.present_illness.tumor_size_chart} />
+          <TumorSizeChart data={tumorChart} />
         </FigmaReportCard>
       )}
       <HistoryTextCard title="既往史" content={data.past_history} evidence="证据来源：既往病史记录" />
