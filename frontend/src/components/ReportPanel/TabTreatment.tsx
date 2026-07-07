@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Tag } from 'antd'
 import { usePatientStore } from '../../store'
 import type { TreatmentData, TreatmentPlan, ClinicalTrial } from '../../types'
@@ -45,7 +45,7 @@ function PlanCard({ plan }: { plan: TreatmentPlan }) {
           </svg>
         </span>
         <span className="treatment-plan-name">
-          {plan.name || '未命名方案'}
+          {safeText(plan.name) || '未命名方案'}
           <span className="treatment-plan-score"> | 获益评分：{(((Number(plan.efficacy_score) || 0) + (Number(plan.prognosis_score) || 0)) / 2).toFixed(2)}</span>
         </span>
         {plan.strategy && (
@@ -61,9 +61,9 @@ function PlanCard({ plan }: { plan: TreatmentPlan }) {
           <ScoreBar label="预后" value={plan.prognosis_score} color="#0071e3" />
         </div>
         <div className="treatment-plan-detail">
-          {plan.reason && <div className="treatment-plan-detail-item"><strong>推荐理由：</strong>{plan.reason}</div>}
+          {plan.reason && <div className="treatment-plan-detail-item"><strong>推荐理由：</strong>{safeText(plan.reason)}</div>}
           {plan.adverse_handling && (
-            <div className="treatment-plan-detail-item"><strong>不良反应处理：</strong>{plan.adverse_handling}</div>
+            <div className="treatment-plan-detail-item"><strong>不良反应处理：</strong>{safeText(plan.adverse_handling)}</div>
           )}
         </div>
       </div>
@@ -86,9 +86,114 @@ function TreatmentTextCard({ title, content, evidence }: { title: string; conten
   if (!text) return null
   return (
     <FigmaReportCard title={title} icon="treatment" evidence={evidence} tab={TAB}>
-      <ClinicalText text={text} />
+      <TreatmentRichText text={text} />
     </FigmaReportCard>
   )
+}
+
+function TreatmentRichText({ text }: { text: string }) {
+  const blocks = splitTreatmentBlocks(text)
+  return (
+    <div className="clinical-text treatment-rich-text">
+      {blocks.map((block, index) => renderTreatmentBlock(block, index))}
+    </div>
+  )
+}
+
+type TreatmentBlock =
+  | { type: 'table'; rows: string[][] }
+  | { type: 'list'; items: string[] }
+  | { type: 'heading'; text: string }
+  | { type: 'text'; text: string }
+
+function splitTreatmentBlocks(text: string): TreatmentBlock[] {
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const blocks: TreatmentBlock[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i].trim()
+    if (!line) {
+      i += 1
+      continue
+    }
+
+    if (isMarkdownTableStart(lines, i)) {
+      const tableLines: string[] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i].trim())
+        i += 1
+      }
+      const rows = tableLines
+        .filter((row) => !/^\|[-: |]+\|$/.test(row))
+        .map((row) => row.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim()))
+        .filter((row) => row.some(Boolean))
+      if (rows.length) blocks.push({ type: 'table', rows })
+      continue
+    }
+
+    if (/^#{1,4}\s+/.test(line)) {
+      blocks.push({ type: 'heading', text: line.replace(/^#{1,4}\s+/, '') })
+      i += 1
+      continue
+    }
+
+    if (/^[-*]\s+/.test(line) || /^\d+[.、]\s+/.test(line)) {
+      const items: string[] = []
+      while (i < lines.length) {
+        const itemLine = lines[i].trim()
+        if (!/^[-*]\s+/.test(itemLine) && !/^\d+[.、]\s+/.test(itemLine)) break
+        items.push(itemLine.replace(/^[-*]\s+/, '').replace(/^\d+[.、]\s+/, ''))
+        i += 1
+      }
+      blocks.push({ type: 'list', items })
+      continue
+    }
+
+    blocks.push({ type: 'text', text: line })
+    i += 1
+  }
+
+  return blocks
+}
+
+function isMarkdownTableStart(lines: string[], index: number) {
+  const current = lines[index]?.trim() || ''
+  const next = lines[index + 1]?.trim() || ''
+  return current.startsWith('|') && current.endsWith('|') && /^\|[-: |]+\|$/.test(next)
+}
+
+function renderTreatmentBlock(block: TreatmentBlock, index: number): ReactNode {
+  if (block.type === 'heading') {
+    return <h4 key={`heading-${index}`} className="treatment-rich-text__heading">{block.text}</h4>
+  }
+  if (block.type === 'list') {
+    return (
+      <ul key={`list-${index}`} className="treatment-rich-text__list">
+        {block.items.map((item, itemIndex) => <li key={`${item.slice(0, 20)}-${itemIndex}`}><ClinicalText text={item} compact /></li>)}
+      </ul>
+    )
+  }
+  if (block.type === 'table') {
+    const [header, ...body] = block.rows
+    return (
+      <div key={`table-${index}`} className="trace-table-wrap treatment-rich-text__table">
+        <table>
+          <thead>
+            <tr>{header.map((cell, cellIndex) => <th key={`${cell}-${cellIndex}`}>{cell}</th>)}</tr>
+          </thead>
+          <tbody>
+            {body.map((row, rowIndex) => (
+              <tr key={`row-${rowIndex}`}>
+                {header.map((_, cellIndex) => <td key={`cell-${cellIndex}`}>{row[cellIndex] || ''}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  return <ClinicalText key={`text-${index}`} text={block.text} compact />
 }
 
 function TrialCard({ trial }: { trial: ClinicalTrial }) {

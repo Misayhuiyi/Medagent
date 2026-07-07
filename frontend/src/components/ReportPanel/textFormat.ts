@@ -35,6 +35,20 @@ const VALUE_LABELS: Record<string, string> = {
   quit_duration: '戒烟时长',
   noKnownAllergy: '无明确过敏史',
   notMentioned: '资料未提及',
+  name: '方案名称',
+  regimen: '方案',
+  drugs: '用药',
+  drug: '药物',
+  dose: '剂量',
+  route: '给药途径',
+  schedule: '给药日程',
+  cycle: '给药周期',
+  treatment_line: '治疗线',
+  strategy: '策略',
+  evidence_level: '证据等级',
+  recommendation_level: '推荐级别',
+  citation: '引用',
+  reference: '参考文献',
 }
 
 function labelFor(key: string): string {
@@ -72,11 +86,36 @@ export function formatClinicalValue(value: unknown, depth = 0): string {
 }
 
 function cleanClinicalText(value: string): string {
-  return value
+  return expandAbbreviations(
+    value
     .replace(/([：:；;，,（(]\s*)数据[：:]/g, '$1')
     .replace(/^数据[：:]\s*/gm, '')
     .replace(/([：:])\s*状态[：:]\s*/g, '$1')
+    .replace(/(方案名称[：:]\s*)+(方案内容[：:]\s*)+/g, '方案名称：')
+    .replace(/(引用来源[：:]\s*)+(方案内容[：:]\s*)+/g, '引用来源：')
+    .replace(/(方案内容[：:]\s*){2,}/g, '方案内容：')
+    .replace(/(?<!\[)\bR\s*([1-9]\d?)\b(?!\])/g, '[R$1]')
+    .replace(/\[\s*R\s*([1-9]\d?)\s*\]/g, '[R$1]')
     .trim()
+  )
+}
+
+function expandAbbreviations(value: string): string {
+  const map: Record<string, string> = {
+    CIP: 'CIP（免疫检查点抑制剂相关肺炎）',
+    ILD: 'ILD（间质性肺疾病）',
+    PAP: 'PAP（肺泡蛋白沉积症）',
+    DLCO: 'DLCO（一氧化碳弥散量）',
+    HRCT: 'HRCT（高分辨率胸部CT）',
+    WLL: 'WLL（全肺灌洗）',
+    MRD: 'MRD（微小残留病灶）',
+    irAE: 'irAE（免疫相关不良事件）',
+  }
+  let text = value
+  for (const [abbr, full] of Object.entries(map)) {
+    text = text.replace(new RegExp(`\\b${abbr}\\b(?![（(])`), full)
+  }
+  return text
 }
 
 function naturalizeStructuredObject(obj: Record<string, unknown>): string {

@@ -11,16 +11,19 @@ const AUTO_TERMS: Record<SemanticHighlight['color'], string[]> = {
   red: [
     '免疫检查点抑制相关肺炎', '免疫相关性肺炎', '肺泡蛋白沉积症', '炎症后肺纤维化',
     '不良反应', '毒副反应', '肺炎', '间质性炎症', '间质性肺病', '肺纤维化',
+    'CIP', 'ILD', 'PAP', 'irAE', 'CTCAE', 'G3', '3级',
     '气胸', '咯血', '发热', '感染', '高血糖', '肝功能异常', '风险', '禁忌', '警惕', '恶化',
   ],
   blue: [
     '左肺腺癌', '肺恶性肿瘤', '肿瘤负荷', '原发灶', '靶病灶', '肿瘤', '病灶', '结节',
-    '分期', '复发', '进展', '转移', '淋巴结', 'KRAS G12C', 'KRAS', 'TP53', 'PD-L1', 'PDL1', 'TMB', 'RECIST', 'CT', 'PET-CT',
+    '分期', '复发', '进展', '转移', '淋巴结', 'KRAS G12C', 'KRAS', 'TP53', 'PD-L1', 'PDL1', 'TMB', 'RECIST', 'TNM', 'pT', 'cT', 'CT', 'PET-CT',
   ],
   green: [
     '新辅助治疗', '辅助治疗', '维持治疗', '抗血管生成', '靶向治疗', '免疫治疗',
     '治疗', '疗效', '缓解', '缩小', '稳定', '改善', '随访', '复查', '手术',
-    '化疗', '培美曲塞', '卡铂', '信迪利单抗', '贝伐珠单抗', '索托拉西布', '阿达格拉西布', '康复', '护理', '监测',
+    '化疗', '培美曲塞', '卡铂', '信迪利单抗', '贝伐珠单抗', '索托拉西布', '阿达格拉西布',
+    'DLCO', 'HRCT', 'WLL', 'MRD', 'Ⅰ类', 'ⅡA类', 'ⅡB类', '1类', '2A类', '2B类',
+    '康复', '护理', '监测',
   ],
 }
 
@@ -90,16 +93,102 @@ export default function ClinicalText({
   if (!value) return null
   const effectiveHighlights = highlights.length ? highlights : autoHighlights(value)
 
-  const paragraphs = value
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-
   return (
     <div className={compact ? 'clinical-text clinical-text--compact' : 'clinical-text'}>
-      {paragraphs.map((line, index) => (
-        <p key={`${line.slice(0, 24)}-${index}`}>{renderHighlighted(line, effectiveHighlights)}</p>
-      ))}
+      {renderClinicalBlocks(value, effectiveHighlights)}
     </div>
   )
+}
+
+type ClinicalBlock =
+  | { type: 'table'; rows: string[][] }
+  | { type: 'list'; items: string[] }
+  | { type: 'heading'; text: string }
+  | { type: 'text'; text: string }
+
+function renderClinicalBlocks(value: string, highlights: SemanticHighlight[]) {
+  const blocks = splitClinicalBlocks(value)
+  return blocks.map((block, index) => {
+    if (block.type === 'heading') {
+      return <h4 key={`heading-${index}`} className="clinical-text__heading">{renderHighlighted(block.text, highlights)}</h4>
+    }
+    if (block.type === 'list') {
+      return (
+        <ul key={`list-${index}`} className="clinical-text__list">
+          {block.items.map((item, itemIndex) => <li key={`${item.slice(0, 20)}-${itemIndex}`}>{renderHighlighted(item, highlights)}</li>)}
+        </ul>
+      )
+    }
+    if (block.type === 'table') {
+      const [header, ...body] = block.rows
+      return (
+        <div key={`table-${index}`} className="trace-table-wrap clinical-text__table">
+          <table>
+            <thead>
+              <tr>{header.map((cell, cellIndex) => <th key={`${cell}-${cellIndex}`}>{renderHighlighted(cell, highlights)}</th>)}</tr>
+            </thead>
+            <tbody>
+              {body.map((row, rowIndex) => (
+                <tr key={`row-${rowIndex}`}>
+                  {header.map((_, cellIndex) => <td key={`cell-${cellIndex}`}>{renderHighlighted(row[cellIndex] || '', highlights)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+    return <p key={`${block.text.slice(0, 24)}-${index}`}>{renderHighlighted(block.text, highlights)}</p>
+  })
+}
+
+function splitClinicalBlocks(value: string): ClinicalBlock[] {
+  const lines = value.replace(/\r\n/g, '\n').split('\n')
+  const blocks: ClinicalBlock[] = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i].trim()
+    if (!line) {
+      i += 1
+      continue
+    }
+    if (isMarkdownTableStart(lines, i)) {
+      const tableLines: string[] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i].trim())
+        i += 1
+      }
+      const rows = tableLines
+        .filter((row) => !/^\|[-: |]+\|$/.test(row))
+        .map((row) => row.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim()))
+        .filter((row) => row.some(Boolean))
+      if (rows.length) blocks.push({ type: 'table', rows })
+      continue
+    }
+    if (/^#{1,4}\s+/.test(line)) {
+      blocks.push({ type: 'heading', text: line.replace(/^#{1,4}\s+/, '') })
+      i += 1
+      continue
+    }
+    if (/^[-*]\s+/.test(line) || /^\d+[.、]\s+/.test(line)) {
+      const items: string[] = []
+      while (i < lines.length) {
+        const itemLine = lines[i].trim()
+        if (!/^[-*]\s+/.test(itemLine) && !/^\d+[.、]\s+/.test(itemLine)) break
+        items.push(itemLine.replace(/^[-*]\s+/, '').replace(/^\d+[.、]\s+/, ''))
+        i += 1
+      }
+      blocks.push({ type: 'list', items })
+      continue
+    }
+    blocks.push({ type: 'text', text: line })
+    i += 1
+  }
+  return blocks
+}
+
+function isMarkdownTableStart(lines: string[], index: number) {
+  const current = lines[index]?.trim() || ''
+  const next = lines[index + 1]?.trim() || ''
+  return current.startsWith('|') && current.endsWith('|') && /^\|[-: |]+\|$/.test(next)
 }

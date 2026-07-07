@@ -117,7 +117,7 @@ SECTION_PATTERNS: dict[str, list[str]] = {
     "AI 不良反应评估": ["不良反应热力图", "不良反应评估", "不良反应预测评分"],
     "AI 合并症评估": ["合并症", "并发症", "基础疾病"],
     "AI 诊断": ["诊断", "核心诊断", "综合评估结论"],
-    "AI 治疗方案": ["针对肿瘤的治疗方案", "综合治疗计划", "完整治疗方案"],
+    "AI 治疗方案": ["针对肿瘤的治疗方案", "综合治疗计划", "完整治疗方案", "治疗方案", "推荐治疗方案"],
     "不良反应处理": ["针对不良反应的治疗方案", "不良反应处理", "重要风险提示"],
     "合并症处理": ["针对合并症的治疗方案", "合并症处理"],
     "肿瘤预测": ["疗效预测评分与肿瘤大小变化曲线", "肿瘤大小变化预测曲线", "疗效预测"],
@@ -129,6 +129,28 @@ SECTION_PATTERNS: dict[str, list[str]] = {
     "护理措施": ["护理措施", "日常护理", "治疗相关护理"],
     "随访计划": ["随访计划", "具体随访建议"],
 }
+
+
+TREATMENT_SECTION_TITLES = {"AI 治疗方案", "不良反应处理", "合并症处理"}
+TREATMENT_FIELD_KEYS = {"treatment_plans", "adverse_reaction_plan", "comorbidity_plan"}
+CHART_SECTION_TITLES = {"AI 肿瘤负荷评估", "AI 肿瘤疗效评估", "AI 不良反应评估", "肿瘤预测", "不良反应预测", "预后分析"}
+CHART_FIELD_KEYS = {"ai_tumor_burden", "ai_efficacy", "ai_adverse_events", "tumor_prediction", "adverse_prediction", "prognosis"}
+TREATMENT_LABELS = [
+    "方案名称", "方案内容", "引用来源", "推荐理由", "推荐级别", "证据等级", "适用条件", "注意事项",
+    "剂量", "给药周期", "给药途径", "治疗线", "随访监测", "复发后策略", "临床试验", "参考文献",
+    "处理措施", "监测项目", "触发条件", "指南依据",
+]
+ABBREVIATION_EXPANSIONS: dict[str, str] = {
+    "CIP": "CIP（免疫检查点抑制剂相关肺炎）",
+    "ILD": "ILD（间质性肺疾病）",
+    "PAP": "PAP（肺泡蛋白沉积症）",
+    "DLCO": "DLCO（一氧化碳弥散量）",
+    "HRCT": "HRCT（高分辨率胸部CT）",
+    "WLL": "WLL（全肺灌洗）",
+    "MRD": "MRD（微小残留病灶）",
+    "irAE": "irAE（免疫相关不良事件）",
+}
+ASCII_CHART_CHARS = "┤┊╱━─╭╮╰╯│┌┐└┘├┬┴┼█▇▆▅▄▃▂▁●○◆◇▲▼■□\\/"
 
 
 OUTPUT_NOISE_MARKERS = [
@@ -234,7 +256,13 @@ def normalize_report(report: dict, title: str, patient_info: dict | None = None)
             content = _infer_chief_complaint(model.chart_source)
 
         if content and content.strip():
-            model.sections.append(ReportSection(title=title_text, content=_polish_content(content), tone=tone))
+            is_treatment = title_text in TREATMENT_SECTION_TITLES or (field or "") in TREATMENT_FIELD_KEYS
+            is_chart = title_text in CHART_SECTION_TITLES or (field or "") in CHART_FIELD_KEYS
+            model.sections.append(ReportSection(
+                title=title_text,
+                content=_polish_content(content, treatment=is_treatment, chart=is_chart, preserve_tables=is_treatment or is_chart),
+                tone=tone,
+            ))
             matches_found.setdefault(tab_key, set()).add(title_text)
 
     # Collect unmatched useful sections into one stable row. This preserves
@@ -254,7 +282,12 @@ def normalize_report(report: dict, title: str, patient_info: dict | None = None)
                     is_matched = True
                     break
             if not is_matched and body.strip() and len(body.strip()) > 10:
-                polished = _polish_content(body, max_chars=1600)
+                is_chart = _is_chart_heading(heading) or _contains_chart_artifacts(body)
+                polished = _polish_content(body, max_chars=1600, chart=is_chart, preserve_tables=is_chart)
+                if is_chart:
+                    extracted_tables = _extract_chart_tables_from_text(body)
+                    if extracted_tables and extracted_tables not in polished:
+                        polished = "\n\n".join([extracted_tables, polished])
                 if polished:
                     supplemental_parts.append(f"【{heading}】\n{polished}")
                 if len(supplemental_parts) >= MAX_SUPPLEMENTAL_SECTIONS:
@@ -439,6 +472,14 @@ def _value_to_text(value: Any, context: str = "") -> str:
     if isinstance(value, (int, float, bool)):
         return str(value)
     if isinstance(value, list):
+        if context in TREATMENT_FIELD_KEYS or "treatment" in context.lower():
+            table = _treatment_list_to_table(value)
+            if table:
+                return table
+        if context == "adverse_prediction":
+            table = _adverse_prediction_to_table(value)
+            if table:
+                return table
         parts = []
         for item in value:
             if isinstance(item, dict):
@@ -449,11 +490,253 @@ def _value_to_text(value: Any, context: str = "") -> str:
     if isinstance(value, dict):
         if isinstance(value.get("summary"), str):
             return value["summary"].strip()
+        if context in CHART_FIELD_KEYS:
+            table = _chart_value_to_table(value, context)
+            if table:
+                return table
         natural = _naturalize_structured_dict(value, context)
         if natural:
             return natural
         return _dict_to_text(value)
     return str(value)
+
+
+def _adverse_prediction_to_table(value: list[Any]) -> str:
+    rows: list[list[str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = _first_text(item, "name", "不良反应", "event", "reaction") or "未命名不良反应"
+        labels = [str(x) for x in _first_list(item.get("labels"), item.get("dates"), item.get("xAxis"))]
+        grade3_raw = _first_list(item.get("grade3"), item.get("g3"), item.get("grade_3"))
+        grade2_raw = _first_list(item.get("grade2"), item.get("g2"), item.get("grade_2"))
+        values = grade3_raw or grade2_raw
+        numbers = [_clinical_number(v) for v in values]
+        valid = [n for n in numbers if n is not None]
+        max_value = max(valid) if valid else None
+        risk = _risk_level(max_value)
+        trend = _series_trend(labels, numbers, "%" if max_value and max_value > 1 else "")
+        monitor = _first_text(item, "monitoring", "monitor", "监测建议") or _default_adverse_monitor(name)
+        action = _first_text(item, "management", "handling", "处理建议") or _default_adverse_action(risk)
+        rows.append([name, _format_number(max_value, "%"), risk, trend, monitor, action])
+    if not rows:
+        return ""
+    return "\n".join([
+        "| 不良反应 | 预测概率 | 风险等级 | 趋势说明 | 监测建议 | 处理建议 |",
+        "|---|---:|---|---|---|---|",
+        *["| " + " | ".join(cell.replace("|", "／") for cell in row) + " |" for row in rows],
+    ])
+
+
+def _chart_value_to_table(value: dict, context: str) -> str:
+    if context == "prognosis":
+        paired = _paired_chart_rows(value, "pfs", "os", "无进展生存", "总生存", "%")
+        if paired:
+            return paired
+    multi = _multi_series_to_trend_table(value, _chart_fallback_name(context))
+    if multi:
+        return multi
+    return ""
+
+
+def _paired_chart_rows(value: dict, key_a: str, key_b: str, label_a: str, label_b: str, unit: str) -> str:
+    labels = [str(x) for x in _first_list(value.get("labels"), value.get("dates"), value.get("xAxis"))]
+    vals_a = _first_list(value.get(key_a), value.get(key_a.upper()))
+    vals_b = _first_list(value.get(key_b), value.get(key_b.upper()))
+    if not labels or not vals_a or not vals_b:
+        return ""
+    rows: list[list[str]] = []
+    for index, label in enumerate(labels):
+        a = _clinical_number(vals_a[index] if index < len(vals_a) else None)
+        b = _clinical_number(vals_b[index] if index < len(vals_b) else None)
+        rows.append([label, label_a, _format_number(a, unit), unit, _point_trend(index, [_clinical_number(v) for v in vals_a]), "用于评估疾病控制时间"])
+        rows.append([label, label_b, _format_number(b, unit), unit, _point_trend(index, [_clinical_number(v) for v in vals_b]), "用于评估总体生存获益"])
+    return _trend_rows_to_markdown(rows)
+
+
+def _multi_series_to_trend_table(value: dict, fallback_name: str) -> str:
+    labels = [str(x) for x in _first_list(value.get("labels"), value.get("dates"), value.get("xAxis"))]
+    if not labels:
+        return ""
+    rows: list[list[str]] = []
+    series = value.get("series")
+    if isinstance(series, list) and series:
+        for item in series:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or item.get("label") or fallback_name)
+            unit = str(item.get("unit") or _unit_for_metric(name))
+            values = [_clinical_number(v) for v in _first_list(item.get("values"), item.get("data"))]
+            rows.extend(_series_rows(labels, name, values, unit))
+    else:
+        values = [_clinical_number(v) for v in _first_list(value.get("values"), value.get("sizes"), value.get("yAxis"))]
+        unit = str(value.get("unit") or _unit_for_metric(fallback_name))
+        rows.extend(_series_rows(labels, str(value.get("name") or fallback_name), values, unit))
+    return _trend_rows_to_markdown(rows)
+
+
+def _series_rows(labels: list[str], name: str, values: list[float | None], unit: str) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for index, label in enumerate(labels):
+        value = values[index] if index < len(values) else None
+        if value is None:
+            continue
+        rows.append([label, name, _format_number(value, unit), unit, _point_trend(index, values), _clinical_explanation(name, value, unit)])
+    return rows
+
+
+def _trend_rows_to_markdown(rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+    return "\n".join([
+        "| 时间点 | 指标 | 数值 | 单位 | 变化趋势 | 临床解释 |",
+        "|---|---|---:|---|---|---|",
+        *["| " + " | ".join(cell.replace("|", "／") for cell in row) + " |" for row in rows],
+    ])
+
+
+def _risk_level(value: float | None) -> str:
+    if value is None:
+        return "资料不足"
+    if value >= 30:
+        return "高风险"
+    if value >= 10:
+        return "中风险"
+    return "低风险"
+
+
+def _format_number(value: float | None, unit: str = "") -> str:
+    if value is None:
+        return "未提及"
+    text = f"{value:g}"
+    return f"{text}{unit}" if unit == "%" else text
+
+
+def _point_trend(index: int, values: list[float | None]) -> str:
+    current = values[index] if index < len(values) else None
+    previous = next((values[i] for i in range(index - 1, -1, -1) if values[i] is not None), None)
+    if current is None:
+        return "缺失"
+    if previous is None:
+        return "基线/首个可比点"
+    delta = current - previous
+    if abs(delta) < 1e-6:
+        return "基本稳定"
+    return "较前上升" if delta > 0 else "较前下降"
+
+
+def _series_trend(labels: list[str], values: list[float | None], unit: str) -> str:
+    points = [(label, values[index]) for index, label in enumerate(labels) if index < len(values) and values[index] is not None]
+    if len(points) < 2:
+        return "暂缺连续时间点"
+    first_label, first = points[0]
+    last_label, last = points[-1]
+    if first is None or last is None:
+        return "资料不完整"
+    direction = "上升" if last > first else "下降" if last < first else "基本稳定"
+    return f"{first_label}至{last_label}{direction}（{_format_number(first, unit)}→{_format_number(last, unit)}）"
+
+
+def _chart_fallback_name(context: str) -> str:
+    return {
+        "tumor_prediction": "肿瘤最大径",
+        "ai_tumor_burden": "肿瘤最大径",
+        "ai_efficacy": "疗效指标",
+        "ai_adverse_events": "不良反应指标",
+    }.get(context, "趋势指标")
+
+
+def _unit_for_metric(name: str) -> str:
+    if any(term in name for term in ("肿瘤", "最大径", "病灶", "长径")):
+        return "mm"
+    if any(term in name for term in ("CEA", "CA153", "CYFRA")):
+        return "ng/mL"
+    if "KL-6" in name or "KL6" in name:
+        return "U/mL"
+    if any(term in name for term in ("FVC", "FEV1", "DLCO")):
+        return "%pred"
+    if any(term in name for term in ("概率", "风险", "PFS", "OS")):
+        return "%"
+    return ""
+
+
+def _clinical_explanation(name: str, value: float, unit: str) -> str:
+    if "DLCO" in name and value < 60:
+        return "弥散功能下降，提示肺部治疗耐受性需重点评估"
+    if "KL-6" in name and value > 500:
+        return "间质性肺损伤/纤维化活动风险升高，需结合HRCT"
+    if unit == "%" and value >= 30:
+        return "风险偏高，需强化监测和预案"
+    return "用于纵向趋势判断，需结合症状和影像"
+
+
+def _default_adverse_monitor(name: str) -> str:
+    if any(term in name for term in ("肺", "呼吸", "CIP", "ILD")):
+        return "每2-4周复查胸部CT/HRCT、肺功能、血氧；症状变化随时复诊"
+    if any(term in name for term in ("血小板", "中性粒", "贫血", "血液")):
+        return "每周血常规，必要时复查凝血功能和感染指标"
+    return "按CTCAE分级随访，治疗期间每周期评估"
+
+
+def _default_adverse_action(risk: str) -> str:
+    if risk == "高风险":
+        return "预设暂停/减量阈值，必要时专科会诊并启动对症处理"
+    if risk == "中风险":
+        return "加强监测，出现2级及以上毒性时及时干预"
+    if risk == "低风险":
+        return "常规监测，出现症状时复评"
+    return "补充资料后再判断"
+
+
+def _treatment_list_to_table(value: list[Any]) -> str:
+    rows: list[list[str]] = []
+    for index, item in enumerate(value, 1):
+        if not isinstance(item, dict):
+            continue
+        name = _first_text(item, "name", "方案名称", "regimen", "方案", "title") or f"方案{index}"
+        line = _first_text(item, "treatment_line", "line", "治疗线", "strategy", "策略")
+        regimen = _join_nonempty([
+            _first_text(item, "drugs", "drug", "用药", "方案内容", "regimen_detail"),
+            _first_text(item, "dose", "剂量"),
+            _first_text(item, "route", "给药途径"),
+            _first_text(item, "schedule", "给药日程", "frequency", "频次"),
+            _first_text(item, "cycle", "给药周期", "周期"),
+        ], "；")
+        reason = _first_text(item, "reason", "推荐理由", "rationale", "依据")
+        evidence = _first_text(item, "evidence_level", "recommendation_level", "证据等级", "推荐级别")
+        source = _first_text(item, "citation", "reference", "references", "source", "引用来源", "指南依据")
+        rows.append([
+            str(item.get("rank") or index),
+            _clean_treatment_text(name),
+            _clean_treatment_text(line),
+            _clean_treatment_text(regimen),
+            _clean_treatment_text(reason),
+            _clean_treatment_text(evidence),
+            _clean_treatment_text(source),
+        ])
+    if not rows:
+        return ""
+    header = "| 排序 | 方案 | 治疗线/策略 | 给药格式 | 推荐理由 | 证据等级 | 引用 |"
+    sep = "|---|---|---|---|---|---|---|"
+    body = ["| " + " | ".join(cell.replace("|", "／") or "未提及" for cell in row) + " |" for row in rows]
+    return "\n".join([header, sep, *body])
+
+
+def _first_text(data: dict, *keys: str) -> str:
+    for key in keys:
+        value = data.get(key)
+        if value is None or value == "":
+            continue
+        if isinstance(value, list):
+            return "、".join(_value_to_text(item, key) for item in value if item)
+        if isinstance(value, dict):
+            return _dict_to_text(value)
+        return str(value).strip()
+    return ""
+
+
+def _join_nonempty(parts: list[str], sep: str = "；") -> str:
+    return sep.join(part.strip() for part in parts if part and part.strip())
 
 
 def _dict_to_text(data: dict, indent: int = 0) -> str:
@@ -638,12 +921,16 @@ def _extract_markdown_section(content: str, section_title: str) -> str:
     candidates = SECTION_PATTERNS.get(section_title, [section_title])
     ranged = _extract_heading_range(content, candidates)
     if ranged:
-        return _polish_content(ranged)
+        is_treatment = section_title in TREATMENT_SECTION_TITLES
+        is_chart = section_title in CHART_SECTION_TITLES
+        return _polish_content(ranged, treatment=is_treatment, chart=is_chart, preserve_tables=is_treatment or is_chart)
     sections = _split_markdown_sections(content)
     for heading, body in sections:
         normalized_heading = _normalize_heading(heading)
         if any(_normalize_heading(candidate) in normalized_heading for candidate in candidates):
-            return _polish_content(body)
+            is_treatment = section_title in TREATMENT_SECTION_TITLES
+            is_chart = section_title in CHART_SECTION_TITLES
+            return _polish_content(body, treatment=is_treatment, chart=is_chart, preserve_tables=is_treatment or is_chart)
     if section_title == "辅助检查":
         return _extract_exam_lines(content)
     return ""
@@ -790,6 +1077,65 @@ def _is_noise_heading(heading: str, body: str = "") -> bool:
     return False
 
 
+def _is_chart_heading(heading: str) -> bool:
+    norm = _normalize_heading(heading)
+    return any(term in norm for term in ("图表", "曲线", "热力图", "最大径", "指标值", "预计值", "趋势图", "预测概率"))
+
+
+def _contains_chart_artifacts(text: str) -> bool:
+    if not text:
+        return False
+    markers = ("●", "╲", "╱", "│", "发生率(%)", "肿瘤最大径", "指标值", "%预计值", "热力图", "FVC", "FEV1", "DLCO", "KL-6")
+    return any(marker in text for marker in markers)
+
+
+def _extract_chart_tables_from_text(text: str) -> str:
+    cleaned = _clean_chart_text(text)
+    converted = _convert_ascii_metric_lines_to_table(cleaned)
+    converted = _convert_heatmap_sentences_to_table(converted)
+    direct_trend = _direct_metric_trend_table(text)
+    if converted == cleaned:
+        return direct_trend
+    parts: list[str] = []
+    if direct_trend:
+        parts.append(direct_trend)
+    for marker in ("### 文本图降级趋势表", "### 不良反应严重程度热力图（矩阵表）"):
+        pos = converted.find(marker)
+        if pos >= 0:
+            next_pos = min([p for p in (converted.find("### ", pos + 4),) if p >= 0] or [len(converted)])
+            parts.append(converted[pos:next_pos].strip())
+    return "\n\n".join(dict.fromkeys(parts))
+
+
+def _direct_metric_trend_table(text: str) -> str:
+    rows: list[list[str]] = []
+    for metric in ("KL-6", "KL6", "CEA", "CA153", "CYFRA", "FVC", "FEV1", "DLCO"):
+        pattern_after = re.compile(rf"{re.escape(metric)}[^0-9]{{0,20}}(\d+(?:\.\d+)?)\s*%?", re.I)
+        pattern_before = re.compile(rf"(\d+(?:\.\d+)?)\s*%?[^A-Za-z0-9]{{0,20}}{re.escape(metric)}", re.I)
+        values = [*_unique_numbers(pattern_after.findall(text)), *_unique_numbers(pattern_before.findall(text))]
+        unit = _unit_for_metric(metric)
+        for value_text in values[:6]:
+            value = _clinical_number(value_text)
+            if value is None:
+                continue
+            rows.append(["未明确", metric, _format_number(value, unit), unit, "旧文本图降级提取", _clinical_explanation(metric, value, unit)])
+    for value_text in _unique_numbers(re.findall(r"(\d+(?:\.\d+)?)\s*mm", text, re.I))[:8]:
+        value = _clinical_number(value_text)
+        if value is not None:
+            rows.append(["未明确", "肿瘤最大径", _format_number(value, "mm"), "mm", "旧文本图降级提取", _clinical_explanation("肿瘤最大径", value, "mm")])
+    if not rows:
+        return ""
+    return "### 文本图降级趋势表\n\n" + _trend_rows_to_markdown(rows)
+
+
+def _unique_numbers(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return result
+
+
 def _extract_chief_complaint_section(content: str) -> str:
     sections = _split_markdown_sections(content)
     for heading, body in sections:
@@ -833,25 +1179,45 @@ def _infer_chief_complaint(content: str) -> str:
     return ""
 
 
-def _polish_content(content: str, max_chars: int = 12000) -> str:
+def _polish_content(content: str, max_chars: int = 12000, *, treatment: bool = False, chart: bool = False, preserve_tables: bool = False) -> str:
     content = _clean_section_content(content, "")
-    content = _markdown_tables_to_lines(content)
+    if treatment:
+        content = _clean_treatment_text(content)
+    if chart:
+        content = _clean_chart_text(content)
+    if not preserve_tables:
+        content = _markdown_tables_to_lines(content)
     lines: list[str] = []
     for raw_line in content.splitlines():
         line = raw_line.strip()
         if not line or line in ("---", "——"):
             continue
-        line = _clean_display_line(line)
+        line = _clean_display_line(line, preserve_table=preserve_tables)
+        if treatment:
+            line = _clean_treatment_text(line)
+        if chart:
+            line = _clean_chart_line(line)
         if _is_ascii_chart_line(line):
             continue
-        if line.startswith("|") and set(line.replace("|", "").strip()) <= {"-", ":"}:
+        if line.startswith("|") and set(line.replace("|", "").strip()) <= {"-", ":"} and not preserve_tables:
             continue
         if any(marker in line for marker in OUTPUT_NOISE_MARKERS):
             continue
         if line.startswith(("好的，", "现在我", "让我整合", "第2阶段完成", "第1阶段", "所有阶段")):
             continue
-        lines.append(line)
+        if treatment:
+            lines.extend(_split_long_treatment_line(line))
+        elif chart:
+            lines.extend(_split_long_chart_line(line))
+        else:
+            lines.append(line)
     text = "\n".join(lines).strip()
+    if treatment:
+        text = _finalize_treatment_text(text)
+    if chart:
+        text = _finalize_chart_text(text)
+    elif _contains_chart_artifacts(text):
+        text = _finalize_chart_text(_clean_chart_text(text))
     if len(text) > max_chars:
         cut = text[:max_chars]
         last_break = max(cut.rfind("\n"), cut.rfind("。"), cut.rfind("；"))
@@ -859,6 +1225,289 @@ def _polish_content(content: str, max_chars: int = 12000) -> str:
             cut = cut[:last_break + 1]
         text = cut.rstrip()
     return text
+
+
+def _clean_treatment_text(text: str) -> str:
+    if not text:
+        return ""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"(方案名称[：:]\s*)+(方案内容[：:]\s*)+", "方案名称：", text)
+    text = re.sub(r"(引用来源[：:]\s*)+(方案内容[：:]\s*)+", "引用来源：", text)
+    text = re.sub(r"(方案内容[：:]\s*){2,}", "方案内容：", text)
+    text = re.sub(r"(推荐理由[：:]\s*)+(方案内容[：:]\s*)+", "推荐理由：", text)
+    label_re = "|".join(re.escape(label) for label in TREATMENT_LABELS)
+    text = re.sub(rf"((?:{label_re})[：:])\s*(?:\1\s*)+", r"\1", text)
+    text = re.sub(r"(?<!^)(?<!\n)(?=(?:方案名称|引用来源|推荐理由|推荐级别|证据等级|适用条件|注意事项|随访监测|复发后策略|临床试验|参考文献)[：:])", "\n", text)
+    text = re.sub(r"(?<!\[)\bR\s*([1-9]\d?)\b(?!\])", r"[R\1]", text)
+    text = re.sub(r"\[\s*R\s*([1-9]\d?)\s*\]", r"[R\1]", text)
+    return text.strip()
+
+
+def _split_long_treatment_line(line: str) -> list[str]:
+    if not line or line.startswith("|"):
+        return [line]
+    if len(line) < 180 or "；" not in line:
+        return [line]
+    prefix = ""
+    match = re.match(r"^([^：:]{2,18}[：:])(.+)$", line)
+    if match:
+        prefix, line = match.group(1), match.group(2)
+    parts = [part.strip(" ；;") for part in re.split(r"[；;]", line) if part.strip(" ；;")]
+    if len(parts) < 3:
+        return [prefix + line if prefix else line]
+    head = [prefix.rstrip("：:")] if prefix else []
+    return [*head, *[f"- {part}" for part in parts]]
+
+
+def _finalize_treatment_text(text: str) -> str:
+    text = _expand_abbreviations(text)
+    text = _normalize_treatment_headings(text)
+    return text
+
+
+def _expand_abbreviations(text: str) -> str:
+    for abbr, full in ABBREVIATION_EXPANSIONS.items():
+        pattern = rf"\b{re.escape(abbr)}\b(?![（(])"
+        text, _count = re.subn(pattern, full, text, count=1)
+    return text
+
+
+def _normalize_treatment_headings(text: str) -> str:
+    lines: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if re.fullmatch(r"(?:当前治疗决策摘要|安全门槛|关键分期与高危因素|治疗时间线|推荐治疗方案|不良反应与肺部并发症处理|合并症与用药管理|随访监测与触发条件|复发或进展后分层策略|临床试验匹配|参考文献)", line):
+            line = f"### {line}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _clean_chart_text(text: str) -> str:
+    if not text:
+        return ""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"(?is)```(?:mermaid|text|ascii)?[\s\S]*?```", "", text)
+    text = re.sub(r"[●○◆◇▲▼■□]+", " ", text)
+    text = re.sub(r"[╱╲━─│┤┊┌┐└┘├┬┴┼█▇▆▅▄▃▂▁]+", " ", text)
+    text = re.sub(r"(发生率|概率|生存率)\s*\(%?\)\s*[\s0-9.%+\-╱╲│┤┊]+", r"\1：", text)
+    cleaned_lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines()]
+    return "\n".join(line for line in cleaned_lines if line).strip()
+
+
+def _clean_chart_line(line: str) -> str:
+    if not line:
+        return ""
+    if line.startswith("|"):
+        return line
+    line = re.sub(r"[●○◆◇▲▼■□╱╲━─│┤┊┌┐└┘├┬┴┼█▇▆▅▄▃▂▁]+", " ", line)
+    line = re.sub(r"\b(?:0\s+3\s+6\s+9\s+12|0\s+1\s+2\s+3\s+4\s+5)\b", " ", line)
+    line = re.sub(r"\s+", " ", line).strip()
+    return line
+
+
+def _split_long_chart_line(line: str) -> list[str]:
+    if not line or line.startswith("|"):
+        return [line]
+    if len(line) < 180:
+        return [line]
+    rows = _risk_rows_from_text(line)
+    if rows:
+        return rows
+    parts = [part.strip(" ；;") for part in re.split(r"[；;。]", line) if part.strip(" ；;")]
+    if len(parts) < 4:
+        return [line]
+    return [f"- {part}" for part in parts]
+
+
+def _finalize_chart_text(text: str) -> str:
+    text = _convert_risk_sentences_to_table(text)
+    text = _convert_heatmap_sentences_to_table(text)
+    text = _convert_ascii_metric_lines_to_table(text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text
+
+
+def _convert_risk_sentences_to_table(text: str) -> str:
+    rows = _risk_rows_from_text(text.replace("|", "；"))
+    if len(rows) < 4:
+        return text
+    table = "\n".join(rows)
+    cleaned = _remove_risk_row_fragments(text)
+    if "各不良反应预测概率" in text or "预测概率" in text:
+        heading = "### 各不良反应预测概率（≥Grade 3）"
+    else:
+        heading = "### 不良反应风险表"
+    return "\n\n".join(part for part in [cleaned.strip(), heading, table] if part)
+
+
+def _risk_rows_from_text(text: str) -> list[str]:
+    pattern = re.compile(
+        r"(?P<name>肺部不良反应|血小板减少|中性粒细胞减少|周围神经毒性|疲劳乏力|恶心/?呕吐|QTc延长|肝功能异常|肾功能异常|感染风险|贫血|白细胞减少|间质性肺炎|呼吸困难)"
+        r"(?:（[^）]{0,40}）)?[：:；;,\s|]*"
+        r"(?P<prob>[<>]?\d+(?:\.\d+)?(?:\s*[-~至]\s*\d+(?:\.\d+)?)?\s*%)"
+        r"[：:；;,\s|]*(?P<monitor>[^。；;\n|]{2,80})?",
+    )
+    matches = list(pattern.finditer(text))
+    if not matches:
+        return []
+    rows = [
+        "| 不良反应 | 预测概率 | 风险等级 | 监测建议 | 处理建议 |",
+        "|---|---:|---|---|---|",
+    ]
+    for match in matches:
+        name = match.group("name").strip()
+        prob = re.sub(r"\s+", "", match.group("prob"))
+        max_prob = _clinical_number(prob)
+        monitor = (match.group("monitor") or _default_adverse_monitor(name)).strip(" ：:；;,")
+        risk = _risk_level(max_prob)
+        rows.append(f"| {name} | {prob} | {risk} | {monitor} | {_default_adverse_action(risk)} |")
+    return rows
+
+
+def _remove_risk_row_fragments(text: str) -> str:
+    text = re.sub(
+        r"(肺部不良反应|血小板减少|中性粒细胞减少|周围神经毒性|疲劳乏力|恶心/?呕吐|QTc延长|肝功能异常|肾功能异常|感染风险|贫血|白细胞减少|间质性肺炎|呼吸困难)"
+        r"(?:（[^）]{0,40}）)?[：:；;,\s|]*[<>]?\d+(?:\.\d+)?(?:\s*[-~至]\s*\d+(?:\.\d+)?)?\s*%[：:；;,\s|]*[^。；;\n|]{0,80}",
+        "",
+        text,
+    )
+    text = re.sub(r"(各不良反应预测概率（?≥?Grade\s*3）?|核心不良反应预测曲线|图\d+[：:]?[^。；\n]{0,40})", "", text, flags=re.I)
+    return re.sub(r"\s{2,}", " ", text).strip(" ；;。")
+
+
+def _convert_heatmap_sentences_to_table(text: str) -> str:
+    if "热力图" not in text and "严重程度" not in text:
+        return text
+    matrix = _heatmap_matrix_from_text(text)
+    if matrix:
+        cleaned = "\n".join(line for line in text.splitlines() if "；" not in line or not re.search(r"[0-4](?:无|轻|中|重)", line))
+        return "\n\n".join(part for part in ["### 不良反应严重程度热力图（矩阵表）", matrix, cleaned.strip(" ；;。")] if part)
+    pattern = re.compile(
+        r"(?P<name>肺部不良反应|免疫相关性肺炎|肺泡蛋白沉积症|左侧气胸|咳嗽/?咳血|气促/?低氧血症|血小板减少|中性粒细胞减少|周围神经毒性|疲劳乏力|恶心/?呕吐|QTc延长|肝功能异常|肾功能异常|感染风险|贫血|白细胞减少)"
+        r"[：:；;,\s]*(?P<grade>G?[0-4](?:级)?|Grade\s*[0-4]|低|中|高)[：:；;,\s]*(?P<time>第?\d+[-~至]?\d*周|T\d+|[^。；;\n]{2,12})?",
+    )
+    matches = list(pattern.finditer(text))
+    if len(matches) < 3:
+        return text
+    rows = [
+        "| 不良反应 | 时间点/阶段 | 严重程度 | 等级说明 |",
+        "|---|---|---|---|",
+    ]
+    for match in matches:
+        grade = match.group("grade").strip()
+        rows.append(f"| {match.group('name')} | {(match.group('time') or '未明确').strip()} | {grade} | {_grade_explanation(grade)} |")
+    cleaned = pattern.sub("", text)
+    return "\n\n".join(part for part in ["### 不良反应严重程度热力图（矩阵表）", "\n".join(rows), cleaned.strip(" ；;。")] if part)
+
+
+def _heatmap_matrix_from_text(text: str) -> str:
+    rows: list[list[str]] = []
+    for line in text.splitlines():
+        if "；" not in line and "|" not in line:
+            continue
+        parts = [part.strip() for part in re.split(r"[；;|]", line) if part.strip()]
+        if len(parts) < 4:
+            continue
+        name = parts[0]
+        grades = parts[1:]
+        if not any(re.search(r"[0-4](?:无|轻|中|重)", grade) for grade in grades):
+            continue
+        normalized = grades[:5] + [""] * max(0, 5 - len(grades))
+        rows.append([name, *normalized[:5], "0=无，1=轻度，2=中度，3=重度"])
+    if not rows:
+        return ""
+    return "\n".join([
+        "| 不良反应 | T1 | T2 | T3 | T4 | T5 | 等级说明 |",
+        "|---|---|---|---|---|---|---|",
+        *["| " + " | ".join(cell.replace("|", "／") for cell in row) + " |" for row in rows],
+    ])
+
+
+def _convert_ascii_metric_lines_to_table(text: str) -> str:
+    rows: list[list[str]] = []
+    kept: list[str] = []
+    block_rows, block_skip = _metric_block_rows(text.splitlines())
+    rows.extend(block_rows)
+    for line in text.splitlines():
+        if line in block_skip:
+            continue
+        clean = line.strip()
+        if not clean:
+            continue
+        heading_match = re.match(r"^【(?P<name>[^】]{2,30})】(?P<body>.*)$", clean)
+        if not heading_match:
+            kept.append(clean)
+            continue
+        name = heading_match.group("name")
+        body = heading_match.group("body")
+        if not any(term in name for term in ("最大径", "指标值", "预计值", "KL-6", "CEA", "CA153", "CYFRA", "FVC", "FEV1", "DLCO")):
+            kept.append(clean)
+            continue
+        unit = _unit_for_metric(name)
+        values = re.findall(r"(?P<label>KL-6|KL6|CEA|CA153|CYFRA|FVC|FEV1|DLCO|基线|手术切除)?\s*(?P<value>\d+(?:\.\d+)?)", body)
+        for label, value in values[:8]:
+            metric = label or name
+            number = _clinical_number(value)
+            if number is None:
+                continue
+            rows.append(["未明确", metric, _format_number(number, unit), unit, "旧文本图降级提取", _clinical_explanation(metric, number, unit)])
+    if not rows:
+        return text
+    table = _trend_rows_to_markdown(rows)
+    return "\n\n".join(["### 文本图降级趋势表", table, *kept])
+
+
+def _metric_block_rows(lines: list[str]) -> tuple[list[list[str]], set[str]]:
+    rows: list[list[str]] = []
+    skipped: set[str] = set()
+    current_name = ""
+    current_body: list[str] = []
+
+    def flush() -> None:
+        nonlocal current_name, current_body
+        if not current_name or not current_body:
+            current_name = ""
+            current_body = []
+            return
+        body = " ".join(current_body)
+        unit = _unit_for_metric(current_name)
+        metric_pattern = re.compile(r"(KL-6|KL6|CEA|CA153|CYFRA|FVC|FEV1|DLCO)?\s*(\d+(?:\.\d+)?)\s*%?")
+        for label, raw in metric_pattern.findall(body):
+            metric = label or current_name
+            value = _clinical_number(raw)
+            if value is None:
+                continue
+            metric_unit = _unit_for_metric(metric) or unit
+            rows.append(["未明确", metric, _format_number(value, metric_unit), metric_unit, "旧文本图降级提取", _clinical_explanation(metric, value, metric_unit)])
+        current_name = ""
+        current_body = []
+
+    for line in lines:
+        clean = line.strip()
+        heading = re.match(r"^【(?P<name>[^】]{2,30})】\s*$", clean)
+        if heading and any(term in heading.group("name") for term in ("最大径", "指标值", "预计值", "KL-6", "CEA", "CA153", "CYFRA", "FVC", "FEV1", "DLCO")):
+            flush()
+            current_name = heading.group("name")
+            skipped.add(line)
+            continue
+        if current_name:
+            if clean.startswith("【") and clean.endswith("】"):
+                flush()
+                continue
+            current_body.append(clean)
+            skipped.add(line)
+    flush()
+    return rows, skipped
+
+
+def _grade_explanation(grade: str) -> str:
+    if "高" in grade or "3" in grade or "4" in grade:
+        return "需重点干预或考虑暂停/调整治疗"
+    if "中" in grade or "2" in grade:
+        return "需加强监测并及时对症处理"
+    if "低" in grade or "1" in grade or "0" in grade:
+        return "常规监测"
+    return "按CTCAE分级复核"
 
 
 def _markdown_tables_to_lines(content: str) -> str:
@@ -927,7 +1576,7 @@ def _clean_table_cell(cell: str) -> str:
     return cell
 
 
-def _clean_display_line(line: str) -> str:
+def _clean_display_line(line: str, preserve_table: bool = False) -> str:
     line = line.strip()
     line = re.sub(r"^#{1,6}\s*", "", line)
     line = re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF\ufe0f\u20e3]", "", line)
@@ -938,7 +1587,7 @@ def _clean_display_line(line: str) -> str:
     line = re.sub(r"([：:；;，,（(]\s*)数据[：:]", r"\1", line)
     line = re.sub(r"^数据[：:]\s*", "", line)
     line = re.sub(r"([：:])\s*状态[：:]\s*", r"\1", line)
-    if "|" in line:
+    if "|" in line and not preserve_table:
         parts = [_clean_table_cell(part) for part in line.split("|")]
         parts = [part for part in parts if part and not set(part) <= {"-", ":"}]
         line = "；".join(parts)
@@ -949,7 +1598,9 @@ def _clean_display_line(line: str) -> str:
 def _is_ascii_chart_line(line: str) -> bool:
     if not line:
         return False
-    chart_chars = set("┤┊╱━─╭╮╰╯│┌┐└┘├┬┴┼█▇▆▅▄▃▂▁")
+    if line.strip().startswith("|"):
+        return False
+    chart_chars = set(ASCII_CHART_CHARS)
     count = sum(1 for ch in line if ch in chart_chars)
     if count >= 2:
         return True

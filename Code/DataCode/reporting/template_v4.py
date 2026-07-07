@@ -185,7 +185,7 @@ def _inline(text: str) -> str:
     escaped = _e(text)
     escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
     escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
-    return _highlight_terms(escaped)
+    return _mark_treatment_tokens(_highlight_terms(escaped))
 
 
 def _highlight_legend(text: str) -> str:
@@ -200,6 +200,7 @@ def _highlight_terms(text: str) -> str:
     red_terms = [
         "免疫检查点抑制相关肺炎", "免疫相关性肺炎", "肺泡蛋白沉积症", "炎症后肺纤维化",
         "不良反应", "毒副反应", "肺炎", "间质性炎症", "间质性肺病", "肺纤维化",
+        "CIP", "ILD", "PAP", "irAE", "CTCAE", "G3", "3级",
         "气胸", "咯血", "发热", "低热", "感染", "高血糖", "肝功能异常",
         "风险", "禁忌", "警惕", "恶化", "延误", "进展风险",
     ]
@@ -207,13 +208,14 @@ def _highlight_terms(text: str) -> str:
         "左肺腺癌", "肺恶性肿瘤", "肿瘤负荷", "原发灶", "靶病灶", "非靶病灶",
         "肿瘤", "病灶", "结节", "分期", "复发", "进展", "转移", "淋巴结",
         "KRAS G12C", "KRAS", "TP53", "PD-L1", "PDL1", "TMB", "RECIST", "CT", "PET-CT", "PET",
-        "cT", "pT", "N0", "N1", "N2", "N3", "M0", "M1", "IIIC", "ⅢB", "ⅠB",
+        "TNM", "cT", "pT", "N0", "N1", "N2", "N3", "M0", "M1", "IIIC", "ⅢB", "ⅠB",
     ]
     green_terms = [
         "新辅助治疗", "辅助治疗", "维持治疗", "抗血管生成", "靶向治疗", "免疫治疗",
         "治疗", "疗效", "缓解", "缩小", "稳定", "改善", "随访", "复查",
         "手术", "切除", "清扫", "化疗", "培美曲塞", "卡铂", "信迪利单抗",
-        "贝伐珠单抗", "索托拉西布", "阿达格拉西布", "康复", "护理", "监测",
+        "贝伐珠单抗", "索托拉西布", "阿达格拉西布", "DLCO", "HRCT", "WLL", "MRD",
+        "康复", "护理", "监测",
     ]
     for css, terms in (("red", red_terms), ("blue", blue_terms), ("green", green_terms)):
         for term in sorted(terms, key=len, reverse=True):
@@ -222,6 +224,16 @@ def _highlight_terms(text: str) -> str:
                 rf'<span class="mark-{css}">\1</span>',
                 text,
             )
+    return text
+
+
+def _mark_treatment_tokens(text: str) -> str:
+    text = re.sub(r"(\[R[1-9]\d?\])", r'<span class="ref-token">\1</span>', text)
+    text = re.sub(
+        r"(?<![\\w>])(Ⅰ类|ⅡA类|ⅡB类|Ⅲ类|1类|2A类|2B类|3类|I类|IIA类|IIB类|III类)(?![\\w<])",
+        r'<span class="evidence-token">\1</span>',
+        text,
+    )
     return text
 
 
@@ -519,7 +531,9 @@ h1 {
 
 .section-body {
   overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: normal;
+  line-break: strict;
+  hyphens: none;
 }
 
 .section-body h3 {
@@ -574,8 +588,10 @@ td {
   padding: 2px 3px;
   border: 1px solid #000;
   vertical-align: top;
-  word-break: break-word;
+  word-break: normal;
   overflow-wrap: anywhere;
+  line-break: strict;
+  hyphens: none;
 }
 
 tr {
@@ -722,5 +738,17 @@ code {
 .mark-green {
   color: #2e7d32;
   font-weight: 700;
+}
+
+.ref-token {
+  color: #5f4b00;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.evidence-token {
+  color: #2e7d32;
+  font-weight: 700;
+  white-space: nowrap;
 }
 """
