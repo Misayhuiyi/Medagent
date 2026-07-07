@@ -1,0 +1,513 @@
+{
+  "batches": [
+    {
+      "batchIndex": 0,
+      "files": [
+        {
+          "path": "Code/DataCode/agent_manager.py",
+          "language": "Python",
+          "sizeLines": 845,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/builtin_tools.py",
+          "language": "Python",
+          "sizeLines": 362,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/config_manager.py",
+          "language": "Python",
+          "sizeLines": 155,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/deep_agent.py",
+          "language": "Python",
+          "sizeLines": 254,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/execute_tool.py",
+          "language": "Python",
+          "sizeLines": 133,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/llm_callback.py",
+          "language": "Python",
+          "sizeLines": 210,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/skill_executor.py",
+          "language": "Python",
+          "sizeLines": 1388,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/tool_registry.py",
+          "language": "Python",
+          "sizeLines": 143,
+          "fileCategory": "code"
+        }
+      ]
+    },
+    {
+      "batchIndex": 1,
+      "files": [
+        {
+          "path": "Code/DataCode/context_manager.py",
+          "language": "Python",
+          "sizeLines": 76,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/execution_logger.py",
+          "language": "Python",
+          "sizeLines": 207,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/knowledge_base.py",
+          "language": "Python",
+          "sizeLines": 285,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/log_setup.py",
+          "language": "Python",
+          "sizeLines": 85,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/mcp_connector.py",
+          "language": "Python",
+          "sizeLines": 197,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/memory_store.py",
+          "language": "Python",
+          "sizeLines": 135,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/pdf_ocr.py",
+          "language": "Python",
+          "sizeLines": 272,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/report_context.py",
+          "language": "Python",
+          "sizeLines": 701,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/report_generator.py",
+          "language": "Python",
+          "sizeLines": 735,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/skill_parser.py",
+          "language": "Python",
+          "sizeLines": 158,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/text_cleaner.py",
+          "language": "Python",
+          "sizeLines": 167,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/todo_manager.py",
+          "language": "Python",
+          "sizeLines": 75,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/web_server.py",
+          "language": "Python",
+          "sizeLines": 268,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/_shared.py",
+          "language": "Python",
+          "sizeLines": 97,
+          "fileCategory": "code"
+        }
+      ]
+    },
+    {
+      "batchIndex": 2,
+      "files": [
+        {
+          "path": "Code/DataCode/reporting/normalizer.py",
+          "language": "Python",
+          "sizeLines": 797,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/reporting/pdf_renderer_v4.py",
+          "language": "Python",
+          "sizeLines": 187,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/reporting/template_v4.py",
+          "language": "Python",
+          "sizeLines": 656,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/reporting/__init__.py",
+          "language": "Python",
+          "sizeLines": 2,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/scripts/batch_pdf_to_md.py",
+          "language": "Python",
+          "sizeLines": 161,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/web_routes/chat.py",
+          "language": "Python",
+          "sizeLines": 496,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/web_routes/debug.py",
+          "language": "Python",
+          "sizeLines": 166,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/web_routes/kb.py",
+          "language": "Python",
+          "sizeLines": 98,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/web_routes/patients.py",
+          "language": "Python",
+          "sizeLines": 176,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Code/DataCode/web_routes/reports.py",
+          "language": "Python",
+          "sizeLines": 163,
+          "fileCategory": "code"
+        }
+      ]
+    },
+    {
+      "batchIndex": 3,
+      "files": [
+        {
+          "path": "Code/main.py",
+          "language": "Python",
+          "sizeLines": 381,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Data/knowledge_base/agent.py",
+          "language": "Python",
+          "sizeLines": 191,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Data/knowledge_base/build_page_map.py",
+          "language": "Python",
+          "sizeLines": 197,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Data/knowledge_base/kb_manager.py",
+          "language": "Python",
+          "sizeLines": 2303,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Data/knowledge_base/tool.py",
+          "language": "Python",
+          "sizeLines": 789,
+          "fileCategory": "code"
+        }
+      ]
+    },
+    {
+      "batchIndex": 4,
+      "files": [
+        {
+          "path": "frontend/src/aidoc.css",
+          "language": "CSS",
+          "sizeLines": 1883,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "language": "TypeScript",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/main.tsx",
+          "language": "TypeScript",
+          "sizeLines": 9,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/hooks/useChat.ts",
+          "language": "TypeScript",
+          "sizeLines": 194,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/services/api.ts",
+          "language": "TypeScript",
+          "sizeLines": 85,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/services/__tests__/api.test.ts",
+          "language": "TypeScript",
+          "sizeLines": 76,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/store/chatStore.ts",
+          "language": "TypeScript",
+          "sizeLines": 63,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/store/editStore.ts",
+          "language": "TypeScript",
+          "sizeLines": 29,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/store/index.ts",
+          "language": "TypeScript",
+          "sizeLines": 4,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/store/patientStore.ts",
+          "language": "TypeScript",
+          "sizeLines": 49,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/store/reportStore.ts",
+          "language": "TypeScript",
+          "sizeLines": 33,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/store/__tests__/stores.test.ts",
+          "language": "TypeScript",
+          "sizeLines": 175,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/test/setup.ts",
+          "language": "TypeScript",
+          "sizeLines": 1,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/types/index.ts",
+          "language": "TypeScript",
+          "sizeLines": 360,
+          "fileCategory": "code"
+        }
+      ]
+    },
+    {
+      "batchIndex": 5,
+      "files": [
+        {
+          "path": "frontend/src/components/ReportPanel/chartData.ts",
+          "language": "TypeScript",
+          "sizeLines": 148,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/ClinicalText.tsx",
+          "language": "TypeScript",
+          "sizeLines": 77,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/DownloadButton.tsx",
+          "language": "TypeScript",
+          "sizeLines": 89,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/EditForm.tsx",
+          "language": "TypeScript",
+          "sizeLines": 69,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/FigmaReportCard.tsx",
+          "language": "TypeScript",
+          "sizeLines": 102,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/index.tsx",
+          "language": "TypeScript",
+          "sizeLines": 389,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/PipelineTiming.tsx",
+          "language": "TypeScript",
+          "sizeLines": 95,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/TabCare.tsx",
+          "language": "TypeScript",
+          "sizeLines": 32,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/TabHistory.tsx",
+          "language": "TypeScript",
+          "sizeLines": 135,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/TabOverview.tsx",
+          "language": "TypeScript",
+          "sizeLines": 162,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/TabPrediction.tsx",
+          "language": "TypeScript",
+          "sizeLines": 162,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/TabTreatment.tsx",
+          "language": "TypeScript",
+          "sizeLines": 127,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/textFormat.ts",
+          "language": "TypeScript",
+          "sizeLines": 50,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ReportPanel/TraceModal.tsx",
+          "language": "TypeScript",
+          "sizeLines": 85,
+          "fileCategory": "code"
+        }
+      ]
+    },
+    {
+      "batchIndex": 6,
+      "files": [
+        {
+          "path": "frontend/src/components/ChatPanel/ChatInput.tsx",
+          "language": "TypeScript",
+          "sizeLines": 81,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ChatPanel/index.tsx",
+          "language": "TypeScript",
+          "sizeLines": 225,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ChatPanel/MessageBubble.tsx",
+          "language": "TypeScript",
+          "sizeLines": 79,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/ChatPanel/MessageList.tsx",
+          "language": "TypeScript",
+          "sizeLines": 45,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/common/ErrorBoundary.tsx",
+          "language": "TypeScript",
+          "sizeLines": 37,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/common/MarkdownRenderer.tsx",
+          "language": "TypeScript",
+          "sizeLines": 137,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/PatientList/AddPatientButton.tsx",
+          "language": "TypeScript",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/PatientList/index.tsx",
+          "language": "TypeScript",
+          "sizeLines": 377,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/src/components/TopBar/index.tsx",
+          "language": "TypeScript",
+          "sizeLines": 12,
+          "fileCategory": "code"
+        }
+      ]
+    },
+    {
+      "batchIndex": 7,
+      "files": [
+        {
+          "path": "frontend/eslint.config.js",
+          "language": "JavaScript",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/vite.config.ts",
+          "language": "TypeScript",
+          "sizeLines": 24,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/dist/assets/index-3VWXxtaj.css",
+          "language": "CSS",
+          "sizeLines": 1884,
+          "fileCategory": "code"
+        },
+        {
+          "path": "frontend/dist/assets/index-BzPFPass.js",
+          "language": "JavaScript",
+          "sizeLines": 569,
+          "fileCategory": "code"
+        }
+      ]
+    }
+  ],
+  "totalBatches": 8
+}

@@ -1,7 +1,9 @@
 import ReactECharts from 'echarts-for-react'
 import type { HistoryData, TimelineItem } from '../../types'
 import FigmaReportCard from './FigmaReportCard'
+import ClinicalText from './ClinicalText'
 import { formatClinicalValue } from './textFormat'
+import { describeSingleSeries, normalizePointChart, sortLabelsWithValues } from './chartData'
 
 const TAB = 'patient-history'
 
@@ -20,14 +22,14 @@ function HistoryTextCard({ title, content, evidence }: { title: string; content:
   if (!text) return null
   return (
     <FigmaReportCard title={title} icon="history" evidence={evidence} tab={TAB}>
-      <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+      <ClinicalText text={text} />
     </FigmaReportCard>
   )
 }
 
 function normalizeTimeline(timeline: unknown): TimelineItem[] {
   if (!Array.isArray(timeline)) return []
-  return timeline.map((item: unknown) => {
+  const items = timeline.map((item: unknown) => {
     if (typeof item !== 'object' || !item) return item as TimelineItem
     const raw = item as Record<string, unknown>
     return {
@@ -37,44 +39,13 @@ function normalizeTimeline(timeline: unknown): TimelineItem[] {
       color: (raw.color as TimelineItem['color']) || 'blue',
       type: String(raw.type || raw.stage || ''),
     }
-  })
-}
-
-function normalizeTumorSizeChart(raw: unknown): { labels: string[]; values: number[] } | null {
-  if (!raw || typeof raw !== 'object') return null
-  const data = raw as Record<string, unknown>
-  const labels = Array.isArray(data.labels) ? data.labels.map(String) :
-    Array.isArray(data.dates) ? data.dates.map(String) :
-    Array.isArray(data.xAxis) ? data.xAxis.map(String) : []
-  const valuesRaw = Array.isArray(data.values) ? data.values :
-    Array.isArray(data.sizes) ? data.sizes :
-    Array.isArray(data.yAxis) ? data.yAxis : []
-  const values = valuesRaw.map((v) => Number(v)).filter((v) => Number.isFinite(v))
-  if (labels.length && values.length === labels.length) return { labels, values }
-
-  const points = Array.isArray(data.points) ? data.points : Array.isArray(data.data) ? data.data : []
-  if (Array.isArray(points) && points.length) {
-    const pointLabels: string[] = []
-    const pointValues: number[] = []
-    points.forEach((item) => {
-      if (!item || typeof item !== 'object') return
-      const p = item as Record<string, unknown>
-      const label = String(p.date || p.time || p.label || '')
-      const value = Number(p.value ?? p.size ?? p.diameter ?? p.long_diameter)
-      if (label && Number.isFinite(value)) {
-        pointLabels.push(label)
-        pointValues.push(value)
-      }
-    })
-    if (pointLabels.length && pointLabels.length === pointValues.length) {
-      return { labels: pointLabels, values: pointValues }
-    }
-  }
-  return null
+  }).filter((item) => item.date || item.label || item.content)
+  const sorted = sortLabelsWithValues(items.map((item) => item.date || item.label), items)
+  return sorted.values
 }
 
 function TimelineView({ timeline }: { timeline: TimelineItem[] }) {
-  if (!timeline.length) return null
+  if (!timeline.length) return <div className="figma-card__text report-muted-block">暂无可展示的病程时间线</div>
   return (
     <div className="report-timeline">
       {timeline.map((item, i) => (
@@ -99,38 +70,53 @@ function TimelineView({ timeline }: { timeline: TimelineItem[] }) {
   )
 }
 
-function TumorSizeChart({ data }: { data: { labels: string[]; values: number[] } }) {
-  if (!data?.labels?.length || !data?.values?.length) {
+function TumorSizeChart({ data }: { data: { labels: string[]; values: Array<number | null> } }) {
+  if (!data?.labels?.length || !data?.values?.length || !data.values.some((value) => value !== null)) {
     return <div className="figma-card__text report-muted-block">暂无肿瘤测量数据（术后或资料未提供）</div>
   }
   if (data.labels.length !== data.values.length) {
     return <div className="figma-card__text report-muted-block">图表数据异常（横纵轴长度不匹配）</div>
   }
   const option = {
-    tooltip: { trigger: 'axis' as const },
+    tooltip: {
+      trigger: 'axis' as const,
+      valueFormatter: (value: unknown) => (typeof value === 'number' ? `${value} mm` : '-'),
+    },
     grid: { left: 40, right: 16, top: 16, bottom: 28 },
-    xAxis: { type: 'category' as const, data: data.labels, axisLabel: { fontSize: 11 } },
+    xAxis: { type: 'category' as const, data: data.labels, axisLabel: { fontSize: 11, rotate: data.labels.length > 5 ? 20 : 0 } },
     yAxis: { type: 'value' as const, name: '毫米', axisLabel: { fontSize: 11 } },
     series: [{
       type: 'line' as const,
       data: data.values,
       smooth: true,
+      connectNulls: false,
       symbolSize: 6,
       itemStyle: { color: '#0071e3' },
+      lineStyle: { color: '#0071e3', width: 2 },
     }],
   }
-  return <ReactECharts option={option} className="report-chart" />
+  return (
+    <>
+      <div className="figma-card__text report-chart-summary">{describeSingleSeries(data.labels, data.values, 'mm')}</div>
+      <ReactECharts option={option} className="report-chart" />
+    </>
+  )
 }
 
 export default function TabHistory({ data }: { data?: HistoryData }) {
   if (!data) return <div className="empty-state">等待病史分析...</div>
   const presentIllness = data.present_illness as unknown as Record<string, unknown> | undefined
   const timeline = normalizeTimeline(presentIllness?.timeline || (data as unknown as Record<string, unknown>).timeline)
-  const tumorChart = normalizeTumorSizeChart(
+  const record = data as unknown as Record<string, unknown>
+  const tumorChart = normalizePointChart(
     presentIllness?.tumor_size_chart ||
     presentIllness?.tumorSizeChart ||
-    (data as unknown as Record<string, unknown>).tumor_size_chart ||
-    (data as unknown as Record<string, unknown>).tumorSizeChart,
+    presentIllness?.tumorSize ||
+    presentIllness?.tumor_size ||
+    record.tumor_size_chart ||
+    record.tumorSizeChart ||
+    record.tumorSize ||
+    record.tumor_size,
   )
 
   return (

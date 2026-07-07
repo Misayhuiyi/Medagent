@@ -4,6 +4,9 @@ import type { Patient, PatientFile } from '../types'
 export interface EncounterSelection {
   admission: string
   discharge: string
+  type?: string
+  label?: string
+  source_admission?: string
 }
 
 interface PatientState {

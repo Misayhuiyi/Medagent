@@ -30,6 +30,14 @@ function formatDate(date: string) {
   return `${parts[0]}-${Number(parts[1])}-${Number(parts[2])}`
 }
 
+function encounterLabel(encounter: EncounterFilter) {
+  if (encounter.label) return encounter.label
+  const date = formatDate(encounter.admission)
+  if (encounter.type === 'outpatient') return `门诊时间 ${date}`
+  if (encounter.type === 'discharge') return `出院时间 ${date}`
+  return `入院时间 ${date}`
+}
+
 export default function ChatPanel() {
   const selectedId = usePatientStore((s) => s.selectedId)
   const patients = usePatientStore((s) => s.patients)
@@ -53,7 +61,9 @@ export default function ChatPanel() {
       index: i,
       admission: enc.admission,
       discharge: enc.discharge,
-      label: `入院时间 ${formatDate(enc.admission)}`,
+      type: enc.type,
+      source_admission: enc.source_admission,
+      label: encounterLabel(enc),
     }))
   }, [selectedPatient])
 
@@ -65,8 +75,9 @@ export default function ChatPanel() {
   // 生成报告 — 传入当前选择的就诊时间
   const handleGenerateReport = () => {
     if (selectedEncounter) {
+      const selectedLabel = encounterLabel(selectedEncounter)
       generateReport(
-        `请基于患者该次就诊（${formatDate(selectedEncounter.admission)}）的病历、检查报告，生成患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。`,
+        `请基于患者该次就诊（${selectedLabel}）的病历、检查报告，生成患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。`,
         selectedEncounter,
       )
     } else {
@@ -176,6 +187,9 @@ export default function ChatPanel() {
                     handleSelectEncounter({
                       admission: enc.admission,
                       discharge: enc.discharge,
+                      type: enc.type,
+                      label: enc.label,
+                      source_admission: enc.source_admission,
                     })
                   }
                 >

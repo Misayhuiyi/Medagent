@@ -87,7 +87,10 @@ async def _ping_candidate(candidate: dict) -> dict:
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=12) as resp:
+            from DataCode.deep_agent import llm_trust_env_proxy
+
+            opener = urllib.request.build_opener() if llm_trust_env_proxy() else urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(req, timeout=12) as resp:
                 return {"status": resp.status, "body": resp.read().decode("utf-8", errors="replace")[:600]}
         except urllib.error.HTTPError as e:
             return {"status": e.code, "body": e.read().decode("utf-8", errors="replace")[:600]}

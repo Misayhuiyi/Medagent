@@ -1,0 +1,470 @@
+{
+  "nodes": [
+    {
+      "id": "Code/DataCode/knowledge_base.py",
+      "type": "module",
+      "label": "RAG知识库与证据等级",
+      "description": "知识库抽象接口+Mock实现+RAG实现+证据等级定义。基于ChromaDB+Ollama bge-m3+CrossEncoder的语义检索，返回KnowledgeResult格式数据。",
+      "key_responsibilities": [
+        "定义证据等级枚举（国际指南→专家意见8级）",
+        "KnowledgeBase Protocol抽象接口",
+        "RagKnowledgeBase具体实现：延迟按绝对路径导入tool.py",
+        "查询级缓存（question+top_k+min_evidence+before_date做缓存键）",
+        "证据等级映射（通过platform.yaml配置驱动+NCCN/CSCO内置规则）",
+        "warmup预热机制：启动时异步触发一次空查询加载embedding模型"
+      ],
+      "key_classes": ["EvidenceLevel", "KnowledgeResult", "KnowledgeBase", "RagKnowledgeBase"],
+      "key_functions": ["query", "_ensure_init", "_map_evidence", "_evidence_label_for", "warmup"],
+      "design_patterns": ["Protocol抽象接口", "延迟加载(Lazy Initialization)", "缓存代理", "工厂方法(_load_evidence_mapping)"],
+      "dependencies": ["hashlib", "importlib", "json", "re", "yaml", "Path", "Protocol/TypedDict"],
+      "risk_flags": ["sys.path临时插入可能引发竞态"],
+      "lines": 285
+    },
+    {
+      "id": "Code/DataCode/report_generator.py",
+      "type": "module",
+      "label": "三格式报告生成器",
+      "description": "Markdown/HTML/PDF三格式报告生成引擎，对齐「肿瘤慢病化管理AI门诊报告V4」模板。包含V4模板章节映射、字段提取、去重、fpdf2 PDF渲染。",
+      "key_responsibilities": [
+        "V4模板章节顺序定义（5个Tab来源→25个章节）",
+        "英中字段名映射兼容LLM输出中文键",
+        "双层字段提取：结构化字段→整Tab _content回退",
+        "跨Tab内容去重（正则移除其他章节Markdown标记）",
+        "HTML生成：首选pdf_renderer_v4专业实现，回退内置Markdown→HTML转换",
+        "PDF生成：首选HTML/CSS无头打印，回退fpdf2+SimHei中文字体",
+        "Unicode安全处理：emoji/数学符号替换为ASCII替代文本",
+        "门诊医生修正建议/签字/附录/附图页模板占位"
+      ],
+      "key_classes": [],
+      "key_functions": ["report_to_markdown", "report_to_html", "report_to_pdf_bytes", "_legacy_report_to_pdf_bytes", "_extract_field", "_get_content_from_tab", "_deduplicate_section_content", "_clean_text"],
+      "design_patterns": ["模板方法(多格式输出)", "策略模式(多PDF后端)", "回退链(Fallback Chain)"],
+      "dependencies": ["json", "os", "datetime", "html.escape", "fpdf2", "DataCode.reporting.pdf_renderer_v4(可选)"],
+      "risk_flags": ["fpdf2中文字体渲染不稳定，依赖SimHei存在", "TTC字体不支持"],
+      "lines": 735
+    },
+    {
+      "id": "Code/DataCode/report_context.py",
+      "type": "module",
+      "label": "跨就诊病历上下文管理",
+      "description": "纵向病历上下文管理器。存储已生成报告供后续就诊使用，支持就诊时间点检测、出院/入院/门诊分类、原始OCR资料累计加载和既往报告上下文组装。",
+      "key_responsibilities": [
+        "OCR文档遍历与PatientDocument封装",
+        "多模式日期提取（年-月-日、年月日、短年份）",
+        "就诊事件检测：入院/门诊/出院分类与日期提取",
+        "时间点资料加载：仅加载选中就诊的原始文件",
+        "累计资料加载：按就诊时间截止点加载全部历史资料",
+        "既往报告遍历与上下文格式化（含token预算截断）",
+        "报告文件名生成与持久化（MD+JSON双格式）",
+        "既往报告摘要提取（肿瘤负荷/治疗反应/不良反应等结构化字段）"
+      ],
+      "key_classes": ["PatientDocument"],
+      "key_functions": ["detect_patient_timepoints", "detect_patient_encounters", "iter_patient_ocr_documents", "load_timepoint_patient_files", "load_cumulative_patient_files", "collect_prior_context_entries", "format_prior_context", "report_to_prior_json"],
+      "design_patterns": ["迭代器模式(iter_*)", "数据类(PatientDocument)", "策略模式(多日期提取策略)"],
+      "dependencies": ["json", "re", "dataclasses", "datetime", "Path"],
+      "risk_flags": ["硬编码2020-2035日期范围", "_INTERNAL_CACHE_DIR_NAME使用下划线前缀可能冲突"],
+      "lines": 701
+    },
+    {
+      "id": "Code/DataCode/skill_parser.py",
+      "type": "module",
+      "label": "SKILL.md解析器",
+      "description": "解析Claude Code Skills标准的SKILL.md文件，支持YAML frontmatter+Markdown body、变量替换和目录批量解析。",
+      "key_responsibilities": [
+        "SKILL.md YAML frontmatter解析并校验必填字段",
+        "SkillDef数据类封装：name/description/body/mode/tools/arguments等",
+        "目录批量解析：遍历子目录加载所有SKILL.md",
+        "变量替换：$ARGUMENTS.xxx和${CLAUDE_SKILL_DIR}",
+        "动态命令注入：!command执行并注入stdout"
+      ],
+      "key_classes": ["SkillDef", "SkillParser"],
+      "key_functions": ["parse", "parse_dir", "resolve_vars", "resolve_context", "_split_frontmatter"],
+      "design_patterns": ["解析器模式(Parser)", "数据类(SkillDef)", "命令模式(!command注入)"],
+      "dependencies": ["re", "shlex", "subprocess", "yaml", "dataclasses", "Path"],
+      "risk_flags": ["!command注入有安全风险（可执行任意命令）", "subprocess超时仅10秒"],
+      "lines": 158
+    },
+    {
+      "id": "Code/DataCode/memory_store.py",
+      "type": "module",
+      "label": "记忆存储系统",
+      "description": "会话内上下文卸载存储，包含短期记忆（内存List）和长期记忆（文件dump）。支持session_id隔离、配置化短期容量上限和token阈值触发卸载。",
+      "key_responsibilities": [
+        "session_id格式校验(YYYY-MM-DD_HHMMSS_xxxxxx)",
+        "记忆路径安全验证（限定Data/memory/TempData/memory前缀）",
+        "短期记忆：追加、获取、选择性清除、超限自动淘汰",
+        "token阈值触发：should_offload判断是否需要卸载到文件",
+        "长期记忆：读/写/追加 MEMORY.md",
+        "原子写入：先写.tmp再os.replace",
+        "工厂方法from_config从ConfigManager构建"
+      ],
+      "key_classes": ["MemoryStore"],
+      "key_functions": ["add_short_term", "get_short_term", "clear_short_term", "should_offload", "dump_to_file", "load_from_file", "read_long_term", "write_long_term", "append_long_term", "from_config"],
+      "design_patterns": ["存储库模式(Repository)", "工厂方法(from_config)", "原子写入(Atomic Write)"],
+      "dependencies": ["json", "os", "re", "datetime", "Path"],
+      "risk_flags": ["MEMORY_ALLOWED_PREFIXES滑动窗口子串匹配可能漏过恶意路径"],
+      "lines": 135
+    },
+    {
+      "id": "Code/DataCode/context_manager.py",
+      "type": "module",
+      "label": "Token监控与上下文压缩",
+      "description": "监控对话token用量，在达到阈值时触发压缩。三级状态：ok正常、summary_compress软压缩（摘要替换早期对话）、force_compress硬压缩（保留最近N轮+系统提示）。",
+      "key_responsibilities": [
+        "Token用量监控：check()返回压缩建议",
+        "summary_threshold/force_threshold双阈值配置",
+        "硬压缩：保留系统提示+最近N轮对话",
+        "软压缩：用LLM生成的摘要替换早期对话",
+        "可配置keep_recent_turns保留轮数",
+        "混合中英文token估算（中文0.5 token/字，英文0.25 token/字）"
+      ],
+      "key_classes": ["ContextManager"],
+      "key_functions": ["check", "compress_force", "compress_summary", "set_context_length", "from_config"],
+      "design_patterns": ["阈值分离(Throttling)", "状态模式(三级压缩状态)", "策略模式(压缩策略)"],
+      "dependencies": ["Callable", "(TYPE_CHECKING) ConfigManager"],
+      "risk_flags": ["token估算仅为粗略近似值", "硬压缩可能丢弃重要上下文"],
+      "lines": 76
+    },
+    {
+      "id": "Code/DataCode/mcp_connector.py",
+      "type": "module",
+      "label": "MCP协议连接器",
+      "description": "通过streamable_http连接外部MCP服务器。支持懒加载工具：index_all收集工具名+描述索引，load_tool按需加载完整定义并注册到ToolRegistry，call_tool执行调用。",
+      "key_responsibilities": [
+        "MCP服务器启停管理：enable过滤、connect/disconnect",
+        "工具索引：list_tools()收集所有工具名+描述+inputSchema",
+        "按需加载：load_tool从索引创建handler闭包并注册到ToolRegistry",
+        "异步调用：call_tool通过ClientSession.call_tool执行",
+        "同步回退：_sync_handler用run_coroutine_threadsafe处理无async上下文",
+        "安全校验：只允许https和http localhost连接",
+        "服务器状态查询：get_server_status/connected/disconnected/unknown"
+      ],
+      "key_classes": ["MCPConnector"],
+      "key_functions": ["index_all", "load_tool", "call_tool", "connect_server", "disconnect_server", "disconnect_all", "list_indexed_tools"],
+      "design_patterns": ["连接器模式(Connector)", "懒加载(Lazy Load)", "适配器模式(同步→异步)"],
+      "dependencies": ["asyncio", "json", "time", "ConfigManager", "ToolRegistry/ToolDef", "mcp.client.streamable_http"],
+      "risk_flags": ["http非localhost连接仅警告不阻止", "同步handler线程安全需验证"],
+      "lines": 197
+    },
+    {
+      "id": "Code/DataCode/pdf_ocr.py",
+      "type": "module",
+      "label": "PDF OCR预处理",
+      "description": "扫描版PDF OCR流水线。使用pypdfium2渲染PDF页面为图片，easyocr进行中英文文字识别，支持批量处理和ChromaDB集成。无需外部poppler/tesseract依赖。",
+      "key_responsibilities": [
+        "PDF→图片渲染（pypdfium2，可调DPI）",
+        "图片→文字识别（easyocr，中英文）",
+        "低置信度过滤（confidence>0.3）",
+        "批量OCR处理多个PDF",
+        "OCR结果→ChromaDB导入（bge-small-zh-v1.5 embedding）"
+      ],
+      "key_classes": ["PDFOcrEngine"],
+      "key_functions": ["ocr_pdf", "ocr_and_save", "batch_ocr", "add_ocr_to_rag"],
+      "design_patterns": ["流水线模式(Pipeline)", "延迟加载(_get_reader)"],
+      "dependencies": ["pypdfium2", "easyocr", "numpy", "PIL", "json", "chromadb", "sentence_transformers"],
+      "risk_flags": ["easyocr初次调用下载模型可能慢", "ChromaDB硬编码默认路径"],
+      "lines": 272
+    },
+    {
+      "id": "Code/DataCode/text_cleaner.py",
+      "type": "module",
+      "label": "LLM文本清洗器",
+      "description": "使用DeepSeek V4 Flash模型逐条清洗MinerU OCR产生的乱码文本。LLM输出即为清洗后文本，不依赖规则标记解析。支持并发清洗和超时控制。",
+      "key_responsibilities": [
+        "定义清洗System Prompt（修复OCR字符混淆、补全缺失字符、移除HTML残片等）",
+        "AsyncOpenAI客户端懒加载（从_app_state获取配置）",
+        "并发清洗：asyncio.Semaphore限流MAX_CONCURRENT=3",
+        "超时控制：单条CLEAN_TIMEOUT_SECONDS=60秒",
+        "LLMCallTracker集成：调用审计追踪",
+        "warmup预热：后台创建客户端实例"
+      ],
+      "key_classes": ["TextCleaner"],
+      "key_functions": ["clean_batch", "_clean_single", "_ensure_client", "warmup"],
+      "design_patterns": ["批处理模式(Batch Processing)", "信号量限流(Semaphore)", "懒加载(Lazy Client Init)"],
+      "dependencies": ["asyncio", "openai.AsyncOpenAI", "DataCode.web_server._app_state", "DataCode.llm_callback.LLMCallTracker"],
+      "risk_flags": ["强依赖DeepSeek API可用性", "清洗失败静默返回原文"],
+      "lines": 167
+    },
+    {
+      "id": "Code/DataCode/execution_logger.py",
+      "type": "module",
+      "label": "三格式执行日志",
+      "description": "按session_id隔离记录执行日志，finalize时一次性写入三种格式：JSON完整结构化日志、MD可读Markdown日志、TXT脱敏日志（仅工具名+耗时+状态，不含思考/参数/返回值）。",
+      "key_responsibilities": [
+        "LogEvent事件模型：thinking/tool_call/tool_result/message/error/info",
+        "三格式日志写入：JSON全量、MD可读、TXT脱敏",
+        "事件脱敏：过滤thinking类型和body/system_prompt/args/result/content字段",
+        "统计汇总：耗时/事件数/工具调用数/错误数",
+        "session_id格式校验"
+      ],
+      "key_classes": ["LogEvent", "ExecutionLogger"],
+      "key_functions": ["log", "log_thinking", "log_tool_call", "log_tool_result", "log_message", "log_error", "finalize", "_sanitize_event"],
+      "design_patterns": ["日志记录器(Logger)", "数据类(LogEvent)", "多格式输出(Multi-format Writer)"],
+      "dependencies": ["json", "re", "time", "dataclasses", "datetime", "Path"],
+      "risk_flags": ["脱敏策略写在代码中而非配置驱动"],
+      "lines": 207
+    },
+    {
+      "id": "Code/DataCode/todo_manager.py",
+      "type": "module",
+      "label": "待办列表管理器",
+      "description": "带状态的Todo列表管理，支持nag reminder。同一时间只允许一个in_progress任务。连续N轮未调用update时返回提醒文本。",
+      "key_responsibilities": [
+        "TodoItem状态管理：pending/in_progress/completed",
+        "状态校验：仅一个in_progress约束",
+        "轮次计数器：tick_round()累计非todo调用轮数",
+        "nag提醒：超过阈值返回<reminder>Update your todos.</reminder>",
+        "渲染：render()可读文本和summary()简短摘要"
+      ],
+      "key_classes": ["TodoItem", "TodoManager"],
+      "key_functions": ["update", "tick_round", "render", "summary"],
+      "design_patterns": ["状态模式(Status)", "计数器(Nag Reminder)"],
+      "dependencies": ["dataclasses"],
+      "risk_flags": [],
+      "lines": 75
+    },
+    {
+      "id": "Code/DataCode/log_setup.py",
+      "type": "module",
+      "label": "统一日志配置",
+      "description": "后端日志配置：控制台INFO简洁输出+Result/logs/backend.log全量DEBUG日志+Result/logs/llm.log LLM专用日志。幂等初始化，带RotatingFileHandler自动轮转。",
+      "key_responsibilities": [
+        "根日志配置：控制台INFO + 后端文件DEBUG",
+        "LLM专用日志：medagent.llm logger独立文件",
+        "RotatingFileHandler：2MB轮转，保留3个备份",
+        "第三方啰嗦logger静音：httpx/httpcore/openai/watchdog设置为WARNING",
+        "幂等初始化：_initialized标志防重复配置"
+      ],
+      "key_classes": [],
+      "key_functions": ["setup_logging", "get_llm_logger"],
+      "design_patterns": ["单例模式(幂等初始化)", "多日志通道(Multi-channel)"],
+      "dependencies": ["logging", "logging.handlers", "Path"],
+      "risk_flags": ["reload模式下handler重复需手动清理"],
+      "lines": 85
+    },
+    {
+      "id": "Code/DataCode/_shared.py",
+      "type": "module",
+      "label": "共享工具函数",
+      "description": "main.py与web_server.py的共享工具。提供.env环境变量加载和LLM候选列表构建功能，避免重复实现。",
+      "key_responsibilities": [
+        "load_env：解析.env，跳过注释/无效值/占位符",
+        "build_llm_candidates：按供应商构建LLM候选列表",
+        "平台网关路由：platform base_url优先，直连公网回退",
+        "重复候选去重：基于(name, base_url, model)签名",
+        "供应商自动补齐：OpenAI/DashScope/DeepSeek默认endpoint+model"
+      ],
+      "key_classes": [],
+      "key_functions": ["load_env", "build_llm_candidates"],
+      "design_patterns": ["静态工具方法(Utility)", "工厂方法(build_llm_candidates)"],
+      "dependencies": ["os", "logging", "Path"],
+      "risk_flags": ["API Key在日志中可能泄漏（未脱敏）"],
+      "lines": 97
+    },
+    {
+      "id": "Code/DataCode/web_server.py",
+      "type": "module",
+      "label": "FastAPI应用工厂",
+      "description": "FastAPI Web服务入口。组装CORS中间件、请求日志中间件、路由注册和SkillExecutor初始化。支持patients/chat/reports/debug/kb路由模块可选加载。",
+      "key_responsibilities": [
+        "FastAPI应用创建与配置（CORS、静态文件挂载）",
+        "项目路径解析和目录初始化",
+        "SkillExecutor完整初始化：ConfigManager→ToolRegistry→AgentManager→MemoryStore→RagKnowledgeBase→SkillExecutor",
+        "LLM候选构建与config注入",
+        "内置工具注册：读文件/写文件/记忆/待办/PDF转换/RAG查询",
+        "ContextManager注入到AgentManager",
+        "后台预热：KB warmup + TextCleaner warmup",
+        "HTTP请求日志中间件"
+      ],
+      "key_classes": [],
+      "key_functions": ["create_app", "_init_skill_executor", "_load_env_file"],
+      "design_patterns": ["应用工厂(Application Factory)", "依赖注入(DI)", "中间件链(Middleware Chain)"],
+      "dependencies": ["FastAPI", "CORSMiddleware", "StaticFiles", "DataCode._shared", "DataCode.log_setup", "DataCode.config_manager", "DataCode.tool_registry", "DataCode.builtin_tools", "DataCode.todo_manager", "DataCode.memory_store", "DataCode.agent_manager", "DataCode.knowledge_base", "DataCode.skill_executor", "DataCode.context_manager", "DataCode.text_cleaner", "DataCode.web_routes.*"],
+      "risk_flags": ["--reload模式下进程隔离可能导致初始化状态不一致"],
+      "lines": 268
+    }
+  ],
+  "edges": [
+    {
+      "from": "Code/DataCode/web_server.py",
+      "to": "Code/DataCode/_shared.py",
+      "label": "导入与调用",
+      "type": "imports",
+      "description": "web_server.py导入load_env和build_llm_candidates用于环境变量加载和LLM候选构建"
+    },
+    {
+      "from": "Code/DataCode/web_server.py",
+      "to": "Code/DataCode/log_setup.py",
+      "label": "导入与调用",
+      "type": "imports",
+      "description": "web_server.py导入setup_logging初始化日志系统"
+    },
+    {
+      "from": "Code/DataCode/web_server.py",
+      "to": "Code/DataCode/context_manager.py",
+      "label": "实例化与注入",
+      "type": "instantiates",
+      "description": "create_app调用ContextManager.from_config创建实例，通过manager._context_manager注入到AgentManager"
+    },
+    {
+      "from": "Code/DataCode/web_server.py",
+      "to": "Code/DataCode/memory_store.py",
+      "label": "实例化与注册",
+      "type": "instantiates",
+      "description": "create_app实例化MemoryStore并注册到ToolRegistry（保存/读取记忆工具）"
+    },
+    {
+      "from": "Code/DataCode/web_server.py",
+      "to": "Code/DataCode/todo_manager.py",
+      "label": "实例化与注册",
+      "type": "instantiates",
+      "description": "create_app实例化TodoManager并注册到ToolRegistry（待办工具）"
+    },
+    {
+      "from": "Code/DataCode/web_server.py",
+      "to": "Code/DataCode/knowledge_base.py",
+      "label": "实例化与预热",
+      "type": "instantiates",
+      "description": "create_app实例化RagKnowledgeBase，注册RAG查询工具，异步调用warmup预热"
+    },
+    {
+      "from": "Code/DataCode/web_server.py",
+      "to": "Code/DataCode/text_cleaner.py",
+      "label": "调用预热方法",
+      "type": "calls",
+      "description": "create_app调用TextCleaner.warmup()后台预热AsyncOpenAI客户端"
+    },
+    {
+      "from": "Code/DataCode/text_cleaner.py",
+      "to": "Code/DataCode/web_server.py",
+      "label": "读取_app_state配置",
+      "type": "reads",
+      "description": "TextCleaner._ensure_client从web_server._app_state读取config获取LLM配置"
+    },
+    {
+      "from": "Code/DataCode/mcp_connector.py",
+      "to": "Code/DataCode/tool_registry.py",
+      "label": "导入ToolRegistry和ToolDef",
+      "type": "imports",
+      "description": "MCPConnector.load_tool创建ToolDef并调用registry.register注册MCP工具"
+    },
+    {
+      "from": "Code/DataCode/report_generator.py",
+      "to": "Code/DataCode/reporting/pdf_renderer_v4.py",
+      "label": "可选回退调用",
+      "type": "calls",
+      "description": "report_to_html和report_to_pdf_bytes首选调用pdf_renderer_v4的专业实现，失败后回退内置实现"
+    },
+    {
+      "from": "Code/DataCode/context_manager.py",
+      "to": "Code/DataCode/config_manager.py",
+      "label": "导入ConfigManager（类型检查）",
+      "type": "imports",
+      "description": "ContextManager.from_config接受ConfigManager实例读取阈值和上下文长度配置"
+    },
+    {
+      "from": "Code/DataCode/memory_store.py",
+      "to": "Code/DataCode/memory_store.py",
+      "label": "自包含依赖",
+      "type": "self_reference",
+      "description": "MemoryStore.from_config从ConfigManager读取memory路径和阈值配置"
+    },
+    {
+      "from": "Code/DataCode/text_cleaner.py",
+      "to": "Code/DataCode/llm_callback.py",
+      "label": "导入LLMCallTracker",
+      "type": "imports",
+      "description": "TextCleaner._clean_single使用LLMCallTracker记录每次LLM调用的开始/成功/失败"
+    },
+    {
+      "from": "Code/DataCode/report_context.py",
+      "to": "Code/DataCode/report_generator.py",
+      "label": "间接关联",
+      "type": "related",
+      "description": "report_context.write_generated_report_markdown保存report_generator生成的MD报告；report_to_prior_json结构化摘要用于纵向上下文"
+    },
+    {
+      "from": "Code/DataCode/knowledge_base.py",
+      "to": "Data/platform.yaml",
+      "label": "读取配置映射",
+      "type": "reads_config",
+      "description": "RagKnowledgeBase._load_evidence_mapping从platform.yaml加载证据等级映射配置"
+    },
+    {
+      "from": "Code/DataCode/_shared.py",
+      "to": ".env",
+      "label": "读取环境变量",
+      "type": "reads_config",
+      "description": "load_env解析.env文件注入os.environ"
+    },
+    {
+      "from": "Code/DataCode/knowledge_base.py",
+      "to": "Code/DataCode/../Data/knowledge_base/tool.py",
+      "label": "动态导入search_guidelines",
+      "type": "imports_dynamic",
+      "description": "RagKnowledgeBase._ensure_init通过importlib动态导入knowledge_base下的tool.py中的search_guidelines函数"
+    },
+    {
+      "from": "Code/DataCode/report_generator.py",
+      "to": "Code/DataCode/report_generator.py",
+      "label": "内部回退链路",
+      "type": "fallback",
+      "description": "report_to_pdf_bytes→V4 HTML renderer→_legacy_report_to_pdf_bytes三级回退"
+    },
+    {
+      "from": "Code/DataCode/log_setup.py",
+      "to": "Result/logs/",
+      "label": "写入日志文件",
+      "type": "writes",
+      "description": "setup_logging创建Result/logs/目录并写入backend.log和llm.log"
+    },
+    {
+      "from": "Code/DataCode/report_context.py",
+      "to": "TempData/patients/*",
+      "label": "读取患者OCR资料",
+      "type": "reads",
+      "description": "iter_patient_ocr_documents遍历患者目录下ocr/*.md文件"
+    },
+    {
+      "from": "Code/DataCode/report_context.py",
+      "to": "Result/*/既往报告/",
+      "label": "读写既往报告",
+      "type": "reads_and_writes",
+      "description": "iter_prior_markdown_entries读取既往报告，write_generated_report_markdown保存新报告"
+    },
+    {
+      "from": "Code/DataCode/execution_logger.py",
+      "to": "Result/*/execution.json",
+      "label": "写入JSON日志",
+      "type": "writes",
+      "description": "finalize将完整结构化日志写入Result/{sessionId}/execution.json"
+    },
+    {
+      "from": "Code/DataCode/execution_logger.py",
+      "to": "Result/*/execution.md",
+      "label": "写入MD日志",
+      "type": "writes",
+      "description": "finalize将Markdown可读日志写入Result/{sessionId}/execution.md"
+    },
+    {
+      "from": "Code/DataCode/execution_logger.py",
+      "to": "Result/*/execution.txt",
+      "label": "写入TXT脱敏日志",
+      "type": "writes",
+      "description": "finalize将脱敏日志写入Result/{sessionId}/execution.txt"
+    },
+    {
+      "from": "Code/DataCode/pdf_ocr.py",
+      "to": "Data/folder-rag/database/chroma_db",
+      "label": "写入OCR结果到RAG",
+      "type": "writes",
+      "description": "add_ocr_to_rag将OCR文本块写入ChromaDB集合"
+    },
+    {
+      "from": "Code/DataCode/memory_store.py",
+      "to": "Data/memory/*/memory_dump.json",
+      "label": "写入记忆文件",
+      "type": "writes",
+      "description": "dump_to_file原子写入短期记忆到memory_dump.json"
+    }
+  ]
+}

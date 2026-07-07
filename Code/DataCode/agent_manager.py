@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-from DataCode.deep_agent import create_deep_agent
+from DataCode.deep_agent import create_deep_agent, make_async_llm_http_client, make_sync_llm_http_client, llm_trust_env_proxy
 
 if TYPE_CHECKING:
     from DataCode.execution_logger import ExecutionLogger
@@ -190,7 +190,7 @@ class AgentManager:
     _PARALLEL_TOOL_STEP_PREFIXES = ("01-", "02-", "03-", "04-", "10-")
 
     def _get_or_create_llm(self, model: str, base_url: str, api_key: str) -> Any:
-        key = (model, base_url or "", api_key or "")
+        key = (model, base_url or "", api_key or "", llm_trust_env_proxy())
         if key not in self._llm_cache:
             from langchain_openai import ChatOpenAI
             self._llm_cache[key] = ChatOpenAI(
@@ -199,6 +199,8 @@ class AgentManager:
                 api_key=api_key or "dummy",
                 temperature=self._config.get("llm.temperature", 0.7) if hasattr(self, '_config') else 0.7,
                 default_headers={"User-Agent": "curl/8.17.0"},
+                http_client=make_sync_llm_http_client(),
+                http_async_client=make_async_llm_http_client(),
             )
         return self._llm_cache[key]
 

@@ -197,11 +197,26 @@ def _highlight_legend(text: str) -> str:
 
 
 def _highlight_terms(text: str) -> str:
-    red_terms = ["不良反应", "肺炎", "气胸", "咯血", "发热", "低热", "风险", "禁忌", "警惕", "恶化"]
-    blue_terms = ["肿瘤", "病灶", "结节", "分期", "转移", "KRAS", "TP53", "PD-L1", "TMB", "CT", "PET"]
-    green_terms = ["治疗", "疗效", "缓解", "缩小", "随访", "手术", "化疗", "靶向", "康复", "护理"]
+    red_terms = [
+        "免疫检查点抑制相关肺炎", "免疫相关性肺炎", "肺泡蛋白沉积症", "炎症后肺纤维化",
+        "不良反应", "毒副反应", "肺炎", "间质性炎症", "间质性肺病", "肺纤维化",
+        "气胸", "咯血", "发热", "低热", "感染", "高血糖", "肝功能异常",
+        "风险", "禁忌", "警惕", "恶化", "延误", "进展风险",
+    ]
+    blue_terms = [
+        "左肺腺癌", "肺恶性肿瘤", "肿瘤负荷", "原发灶", "靶病灶", "非靶病灶",
+        "肿瘤", "病灶", "结节", "分期", "复发", "进展", "转移", "淋巴结",
+        "KRAS G12C", "KRAS", "TP53", "PD-L1", "PDL1", "TMB", "RECIST", "CT", "PET-CT", "PET",
+        "cT", "pT", "N0", "N1", "N2", "N3", "M0", "M1", "IIIC", "ⅢB", "ⅠB",
+    ]
+    green_terms = [
+        "新辅助治疗", "辅助治疗", "维持治疗", "抗血管生成", "靶向治疗", "免疫治疗",
+        "治疗", "疗效", "缓解", "缩小", "稳定", "改善", "随访", "复查",
+        "手术", "切除", "清扫", "化疗", "培美曲塞", "卡铂", "信迪利单抗",
+        "贝伐珠单抗", "索托拉西布", "阿达格拉西布", "康复", "护理", "监测",
+    ]
     for css, terms in (("red", red_terms), ("blue", blue_terms), ("green", green_terms)):
-        for term in terms:
+        for term in sorted(terms, key=len, reverse=True):
             text = re.sub(
                 rf"(?<![\\w>])({_e(term)})(?![\\w<])",
                 rf'<span class="mark-{css}">\1</span>',
@@ -235,39 +250,61 @@ def _render_tumor_trend_chart(source: str) -> str:
     plot_h = height - top - bottom
     values = [p[1] for p in points]
     base = values[0] or max(values)
-    max_value = max(values) * 1.15
-    min_value = 0
+    pct_values = [((value - base) / base * 100) if base else 0 for value in values]
+    all_values = values + pct_values
+    max_value = max(all_values + [100]) * 1.12
+    min_value = min(all_values + [-30, 0])
 
-    coords = []
-    for index, (_, value, _) in enumerate(points):
+    def to_xy(index: int, value: float) -> tuple[float, float]:
         x = left + (plot_w * index / max(len(points) - 1, 1))
         ratio = (value - min_value) / max(max_value - min_value, 1)
         y = top + plot_h - ratio * plot_h
-        coords.append((x, y))
+        return x, y
 
-    line_points = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
+    size_coords = [to_xy(index, value) for index, value in enumerate(values)]
+    pct_coords = [to_xy(index, value) for index, value in enumerate(pct_values)]
+    size_line_points = " ".join(f"{x:.1f},{y:.1f}" for x, y in size_coords)
+    pct_line_points = " ".join(f"{x:.1f},{y:.1f}" for x, y in pct_coords)
     circles = []
     labels = []
-    for (label, value, note), (x, y) in zip(points, coords):
-        change = (value - base) / base * 100 if base else 0
+    for (label, value, note), change, (x, y) in zip(points, pct_values, size_coords):
         circles.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4.5" />')
         labels.append(
             f'<text x="{x:.1f}" y="{height - 28}" text-anchor="middle">{_e(label)}</text>'
             f'<text x="{x:.1f}" y="{y - 9:.1f}" text-anchor="middle">{value:.0f}mm / {change:+.0f}%</text>'
         )
+    trend_text = _tumor_trend_summary(points, pct_values)
     grid = "\n".join(
         f'<line x1="{left}" y1="{top + plot_h * i / 4:.1f}" x2="{width - right}" y2="{top + plot_h * i / 4:.1f}" />'
         for i in range(5)
     )
-    return f"""<svg class="trend-chart" viewBox="0 0 {width} {height}" role="img" aria-label="肿瘤趋势图">
+    return f"""<div class="chart-summary">{_e(trend_text)}</div>
+    <svg class="trend-chart" viewBox="0 0 {width} {height}" role="img" aria-label="肿瘤趋势图">
       <g class="grid">{grid}</g>
       <line class="axis" x1="{left}" y1="{top}" x2="{left}" y2="{height - bottom}" />
       <line class="axis" x1="{left}" y1="{height - bottom}" x2="{width - right}" y2="{height - bottom}" />
-      <polyline class="trend-line" points="{line_points}" />
+      <polyline class="trend-line" points="{size_line_points}" />
+      <polyline class="trend-pct-line" points="{pct_line_points}" />
       <g class="trend-dots">{''.join(circles)}</g>
       <g class="trend-labels">{''.join(labels)}</g>
       <text class="axis-title" x="12" y="18">长径 / 基线变化</text>
+      <text class="axis-title" x="145" y="18" style="fill:#2e7d32">绿色：较基线变化%</text>
     </svg>"""
+
+
+def _tumor_trend_summary(points: list[tuple[str, float, str]], pct_values: list[float]) -> str:
+    if len(points) < 2:
+        return ""
+    first_label, first_value, _ = points[0]
+    last_label, last_value, _ = points[-1]
+    delta = last_value - first_value
+    pct = pct_values[-1] if pct_values else 0
+    direction = "下降" if delta < 0 else "上升" if delta > 0 else "稳定"
+    return (
+        f"趋势说明：{first_label} 基线长径约 {first_value:.0f}mm，"
+        f"{last_label} 最近长径约 {last_value:.0f}mm，较基线{direction} {abs(delta):.0f}mm（{pct:+.0f}%）。"
+        "蓝线表示肿瘤长径，绿线表示相对基线变化百分比。"
+    )
 
 
 def _extract_tumor_points(source: str) -> list[tuple[str, float, str]]:
@@ -292,7 +329,18 @@ def _extract_tumor_points(source: str) -> list[tuple[str, float, str]]:
         results.append((label, value, match.group(0)))
         if len(results) >= 8:
             break
+    results.sort(key=lambda item: (_date_sort_key(item[0]), item[0]))
     return results
+
+
+def _date_sort_key(label: str) -> int:
+    match = re.search(r"(20\d{2})[-/年]?(\d{1,2})?[-/月]?(\d{1,2})?", label)
+    if not match:
+        return 99999999
+    year = int(match.group(1))
+    month = int(match.group(2) or 1)
+    day = int(match.group(3) or 1)
+    return year * 10000 + month * 100 + day
 
 
 def _render_weight_chart(model: ReportViewModel) -> str:
@@ -339,7 +387,7 @@ def _e(value: object) -> str:
 V4_CSS = r"""
 @page {
   size: A4;
-  margin: 13mm 15mm 14mm 15mm;
+  margin: 12mm 10mm;
 }
 
 * {
@@ -358,7 +406,7 @@ body {
 }
 
 .report-page {
-  width: 180mm;
+  width: 190mm;
   margin: 0 auto;
 }
 
@@ -383,6 +431,8 @@ body {
 
 .report-header {
   margin-bottom: 4px;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 h1 {
@@ -414,6 +464,8 @@ h1 {
   margin: 0 0 4px;
   border: 1px solid #000;
   table-layout: fixed;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 .patient-info td {
@@ -428,6 +480,15 @@ h1 {
   border-collapse: collapse;
   border: 1.2px solid #000;
   table-layout: fixed;
+}
+
+.clinical-table thead {
+  display: table-header-group;
+}
+
+.clinical-table tr {
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 .clinical-table th,
@@ -452,6 +513,8 @@ h1 {
 .section-body p {
   margin: 0 0 3px;
   text-align: justify;
+  orphans: 3;
+  widows: 3;
 }
 
 .section-body {
@@ -463,11 +526,15 @@ h1 {
   margin: 3px 0 2px;
   color: #000;
   font-size: 10.5px;
+  break-after: avoid-page;
+  page-break-after: avoid;
 }
 
 .section-body ul {
   margin: 2px 0 3px 15px;
   padding: 0;
+  orphans: 3;
+  widows: 3;
 }
 
 .section-body li {
@@ -479,12 +546,16 @@ blockquote {
   padding: 2px 5px;
   border-left: 2px solid #888;
   background: #fafafa;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 .table-wrap {
   width: 100%;
   margin: 2px 0 4px;
   overflow: visible;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 table {
@@ -494,6 +565,10 @@ table {
   font-size: 9.5px;
 }
 
+thead {
+  display: table-header-group;
+}
+
 th,
 td {
   padding: 2px 3px;
@@ -501,6 +576,11 @@ td {
   vertical-align: top;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+tr {
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 th {
@@ -529,6 +609,7 @@ code {
 }
 
 .appendix-page {
+  break-before: page;
   page-break-before: always;
 }
 
@@ -542,7 +623,8 @@ code {
   margin: 0 0 18px;
   padding: 8px;
   border: 1px solid #000;
-  break-inside: avoid;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 .chart-card h3 {
@@ -556,6 +638,8 @@ code {
   width: 100%;
   height: auto;
   display: block;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 
 .grid line {
@@ -572,6 +656,13 @@ code {
   fill: none;
   stroke: #1976d2;
   stroke-width: 2.4;
+}
+
+.trend-pct-line {
+  fill: none;
+  stroke: #2e7d32;
+  stroke-width: 2.2;
+  stroke-dasharray: 6 4;
 }
 
 .trend-dots circle {
@@ -609,6 +700,13 @@ code {
   border: 1px dashed #777;
   text-align: center;
   color: #333;
+}
+
+.chart-summary {
+  margin: 2px 0 6px;
+  color: #333;
+  font-size: 10.5px;
+  line-height: 1.55;
 }
 
 .mark-red {

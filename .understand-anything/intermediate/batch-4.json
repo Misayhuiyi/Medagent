@@ -1,0 +1,449 @@
+{
+  "nodes": [
+    {
+      "id": "frontend/src/main.tsx",
+      "type": "file",
+      "label": "main.tsx",
+      "description": "React 应用入口点，将 App 根组件挂载到 #root DOM 节点，并使用 StrictMode 包裹",
+      "group": "入口层"
+    },
+    {
+      "id": "frontend/src/App.tsx",
+      "type": "file",
+      "label": "App.tsx",
+      "description": "应用根组件，定义三面板布局外壳：TopBar + 三栏 Grid Workspace (PatientList, ChatPanel, ReportPanel)",
+      "group": "布局层"
+    },
+    {
+      "id": "frontend/src/aidoc.css",
+      "type": "file",
+      "label": "aidoc.css",
+      "description": "全局 CSS 样式系统，1883 行，基于 CSS 变量驱动，覆盖患者树、聊天面板、报告面板、Pipeline 计时等全部 UI 组件样式",
+      "group": "样式层"
+    },
+    {
+      "id": "frontend/src/types/index.ts",
+      "type": "file",
+      "label": "types/index.ts",
+      "description": "全局 TypeScript 类型定义中枢 (360 行)，包括患者、聊天消息、SSE 事件联合类型、5 个报告标签页数据结构、语义高亮等",
+      "group": "类型层"
+    },
+    {
+      "id": "frontend/src/store/index.ts",
+      "type": "file",
+      "label": "store/index.ts",
+      "description": "Zustand 状态管理统一出口，重新导出四个 store：patientStore, chatStore, reportStore, editStore",
+      "group": "状态管理层"
+    },
+    {
+      "id": "frontend/src/store/chatStore.ts",
+      "type": "file",
+      "label": "chatStore.ts",
+      "description": "聊天消息状态 Store (Zustand)，管理消息列表、流式传输标志、最后事件 ID、思考时间，支持增量追加和占位消息",
+      "group": "状态管理层"
+    },
+    {
+      "id": "frontend/src/store/reportStore.ts",
+      "type": "file",
+      "label": "reportStore.ts",
+      "description": "报告标签页状态 Store (Zustand)，管理 5 个标签的结构化数据、标签内容文本、活跃 Tab 切换",
+      "group": "状态管理层"
+    },
+    {
+      "id": "frontend/src/store/patientStore.ts",
+      "type": "file",
+      "label": "patientStore.ts",
+      "description": "患者选择状态 Store (Zustand)，管理患者列表、选中 ID、文件列表、就诊筛选，含自动选择与删除重置逻辑",
+      "group": "状态管理层"
+    },
+    {
+      "id": "frontend/src/store/editStore.ts",
+      "type": "file",
+      "label": "editStore.ts",
+      "description": "报告编辑模式状态 Store (Zustand)，管理编辑开关、表单副本（JSON 深拷贝隔离），提供开始/取消/保存编辑操作",
+      "group": "状态管理层"
+    },
+    {
+      "id": "frontend/src/services/api.ts",
+      "type": "file",
+      "label": "api.ts",
+      "description": "Axios REST API 客户端 (baseURL=/api) + SSE 协议解析器 parseSSE，封装患者/聊天/报告 CRUD 接口及下载 URL 生成",
+      "group": "通信层"
+    },
+    {
+      "id": "frontend/src/hooks/useChat.ts",
+      "type": "file",
+      "label": "useChat.ts",
+      "description": "核心 SSE 流式连接管理 Hook (194 行)，封装消息发送、事件分发、自动取消、模式推断 (chat/report/auto)，驱动聊天与报告生成全流程",
+      "group": "通信层"
+    },
+    {
+      "id": "frontend/src/components/common/MarkdownRenderer.tsx",
+      "type": "file",
+      "label": "MarkdownRenderer.tsx",
+      "description": "富文本渲染组件 (137 行)，基于 react-markdown + remark-gfm + KaTeX，内置 CSV 自动转管道表、LaTeX 格式化、HTML 清理",
+      "group": "通用组件层"
+    },
+    {
+      "id": "frontend/src/components/common/ErrorBoundary.tsx",
+      "type": "file",
+      "label": "ErrorBoundary.tsx",
+      "description": "React 类组件错误边界，捕获子组件渲染异常并展示友好的 fallback UI（含错误信息与组件栈）",
+      "group": "通用组件层"
+    },
+    {
+      "id": "frontend/vite.config.ts",
+      "type": "file",
+      "label": "vite.config.ts",
+      "description": "Vite 构建配置，集成 @vitejs/plugin-react，开发服务器端口 3000，API 代理到 localhost:8000，集成 Vitest (jsdom) 测试环境",
+      "group": "构建层"
+    },
+    {
+      "id": "concept:app-entry",
+      "type": "concept",
+      "label": "应用入口层",
+      "description": "React 应用启动入口，ReactDOM.createRoot + StrictMode 模式，负责挂载根组件",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:layout",
+      "type": "concept",
+      "label": "三栏布局系统",
+      "description": "aidoc-stage > app-shell.v2 > topbar + grid workspace (左侧患者树 | 中间聊天 | 右侧报告)，CSS Grid 三栏自适应布局",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:type-system",
+      "type": "concept",
+      "label": "全局类型系统",
+      "description": "360 行 TypeScript 类型定义，覆盖患者/就诊/文件、聊天消息、SSE 8 种事件联合类型、5 个报告标签页数据模型、疗效/病灶/临床试验等",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:state-management",
+      "type": "concept",
+      "label": "Zustand 状态管理层",
+      "description": "基于 Zustand 的轻量状态管理方案，4 个独立 Store 分别管理聊天流、报告数据、患者选择、编辑模式，无全局耦合",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:api-layer",
+      "type": "concept",
+      "label": "API 通信层",
+      "description": "RESTful API 封装层，Axios 实例统一管理请求超时/Content-Type，提供患者/文件/聊天历史/报告 CRUD 及下载接口",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:sse-stream",
+      "type": "concept",
+      "label": "SSE 流式通信机制",
+      "description": "基于 fetch ReadableStream 的 Server-Sent Events 实现，8 种事件类型 (status/mode/reasoning/token/tab_ready/tab_content/error/done)，驱动实时消息与报告流式生成",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:report-system",
+      "type": "concept",
+      "label": "结构化报告体系",
+      "description": "5 个标签页的结构化门诊报告：患者病史、患者概况（含 TNM 分期/疗效/不良反应）、治疗方案（含决策路径/评分/临床试验）、疗效预测（含生存曲线）、人文关怀与随访建议",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:css-system",
+      "type": "concept",
+      "label": "CSS 变量样式系统",
+      "description": "1883 行 CSS 变量驱动设计系统，定义蓝色主题色板、组件级样式（患者树/聊天气泡/报告卡片/分数条/时间线/Pipeline 计时条等）",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:rich-text",
+      "type": "concept",
+      "label": "富文本渲染管线",
+      "description": "Markdown + LaTeX 数学公式 + GFM 表格 + CSV 自动转表 + HTML 标签清理与转换，多层预处理管道确保 AI 输出正确渲染",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:error-boundary",
+      "type": "concept",
+      "label": "渲染错误边界",
+      "description": "React Error Boundary 类组件模式，捕获子组件渲染异常，展示红色错误信息 + 可展开的组件栈，防止整个应用白屏",
+      "group": "架构概念"
+    },
+    {
+      "id": "concept:build-config",
+      "type": "concept",
+      "label": "构建与代理配置",
+      "description": "Vite 构建工具配置，React 插件、开发服务器端口 3000、/api 代理到后端 8000 端口、Vitest 测试框架集成",
+      "group": "架构概念"
+    },
+    {
+      "id": "ext:TopBar",
+      "type": "external-component",
+      "label": "TopBar (外部)",
+      "description": "顶部导航栏组件，在 App.tsx 中被引用渲染，模块位于 components/TopBar，本批未包含其实现",
+      "group": "外部引用"
+    },
+    {
+      "id": "ext:PatientList",
+      "type": "external-component",
+      "label": "PatientList (外部)",
+      "description": "左侧患者列表树组件，在 App.tsx 中被引用渲染，模块位于 components/PatientList，本批未包含其实现",
+      "group": "外部引用"
+    },
+    {
+      "id": "ext:ChatPanel",
+      "type": "external-component",
+      "label": "ChatPanel (外部)",
+      "description": "中间对话面板组件，在 App.tsx 中被引用渲染，模块位于 components/ChatPanel，本批未包含其实现",
+      "group": "外部引用"
+    },
+    {
+      "id": "ext:ReportPanel",
+      "type": "external-component",
+      "label": "ReportPanel (外部)",
+      "description": "右侧报告面板组件，在 App.tsx 中被引用渲染，模块位于 components/ReportPanel，本批未包含其实现",
+      "group": "外部引用"
+    }
+  ],
+  "edges": [
+    {
+      "source": "frontend/src/main.tsx",
+      "target": "frontend/src/App.tsx",
+      "relation": "import",
+      "label": "导入根组件"
+    },
+    {
+      "source": "frontend/src/App.tsx",
+      "target": "frontend/src/aidoc.css",
+      "relation": "import-style",
+      "label": "导入全局样式"
+    },
+    {
+      "source": "frontend/src/App.tsx",
+      "target": "ext:TopBar",
+      "relation": "render",
+      "label": "渲染 TopBar"
+    },
+    {
+      "source": "frontend/src/App.tsx",
+      "target": "ext:PatientList",
+      "relation": "render",
+      "label": "渲染 PatientList"
+    },
+    {
+      "source": "frontend/src/App.tsx",
+      "target": "ext:ChatPanel",
+      "relation": "render",
+      "label": "渲染 ChatPanel"
+    },
+    {
+      "source": "frontend/src/App.tsx",
+      "target": "ext:ReportPanel",
+      "relation": "render",
+      "label": "渲染 ReportPanel"
+    },
+    {
+      "source": "frontend/src/store/index.ts",
+      "target": "frontend/src/store/patientStore.ts",
+      "relation": "re-export",
+      "label": "重新导出 usePatientStore"
+    },
+    {
+      "source": "frontend/src/store/index.ts",
+      "target": "frontend/src/store/chatStore.ts",
+      "relation": "re-export",
+      "label": "重新导出 useChatStore"
+    },
+    {
+      "source": "frontend/src/store/index.ts",
+      "target": "frontend/src/store/reportStore.ts",
+      "relation": "re-export",
+      "label": "重新导出 useReportStore"
+    },
+    {
+      "source": "frontend/src/store/index.ts",
+      "target": "frontend/src/store/editStore.ts",
+      "relation": "re-export",
+      "label": "重新导出 useEditStore"
+    },
+    {
+      "source": "frontend/src/store/chatStore.ts",
+      "target": "frontend/src/types/index.ts",
+      "relation": "import-type",
+      "label": "引用 ChatMessage 类型"
+    },
+    {
+      "source": "frontend/src/store/reportStore.ts",
+      "target": "frontend/src/types/index.ts",
+      "relation": "import-type",
+      "label": "引用 TabName, ReportData 类型"
+    },
+    {
+      "source": "frontend/src/store/patientStore.ts",
+      "target": "frontend/src/types/index.ts",
+      "relation": "import-type",
+      "label": "引用 Patient, PatientFile 类型"
+    },
+    {
+      "source": "frontend/src/store/editStore.ts",
+      "target": "frontend/src/types/index.ts",
+      "relation": "import-type",
+      "label": "引用 ReportData, TabName 类型"
+    },
+    {
+      "source": "frontend/src/services/api.ts",
+      "target": "frontend/src/types/index.ts",
+      "relation": "import-type",
+      "label": "引用 Patient, SSEEvent, ReportData 等类型"
+    },
+    {
+      "source": "frontend/src/hooks/useChat.ts",
+      "target": "frontend/src/store/index.ts",
+      "relation": "import",
+      "label": "导入 useChatStore, useReportStore"
+    },
+    {
+      "source": "frontend/src/hooks/useChat.ts",
+      "target": "frontend/src/services/api.ts",
+      "relation": "import",
+      "label": "导入 parseSSE 解析器"
+    },
+    {
+      "source": "frontend/src/hooks/useChat.ts",
+      "target": "frontend/src/types/index.ts",
+      "relation": "import-type",
+      "label": "引用 SSEEvent, TabName, EncounterFilter 类型"
+    },
+    {
+      "source": "frontend/src/main.tsx",
+      "target": "concept:app-entry",
+      "relation": "implements",
+      "label": "实现应用入口"
+    },
+    {
+      "source": "frontend/src/App.tsx",
+      "target": "concept:layout",
+      "relation": "implements",
+      "label": "实现三栏布局"
+    },
+    {
+      "source": "frontend/src/aidoc.css",
+      "target": "concept:css-system",
+      "relation": "implements",
+      "label": "实现 CSS 变量样式系统"
+    },
+    {
+      "source": "frontend/src/types/index.ts",
+      "target": "concept:type-system",
+      "relation": "defines",
+      "label": "定义全局类型系统"
+    },
+    {
+      "source": "frontend/src/types/index.ts",
+      "target": "concept:report-system",
+      "relation": "defines",
+      "label": "定义报告数据模型"
+    },
+    {
+      "source": "frontend/src/types/index.ts",
+      "target": "concept:sse-stream",
+      "relation": "defines",
+      "label": "定义 SSE 事件联合类型"
+    },
+    {
+      "source": "frontend/src/store/index.ts",
+      "target": "concept:state-management",
+      "relation": "aggregates",
+      "label": "聚合状态管理出口"
+    },
+    {
+      "source": "frontend/src/store/chatStore.ts",
+      "target": "concept:state-management",
+      "relation": "belongs-to",
+      "label": "属于状态管理层"
+    },
+    {
+      "source": "frontend/src/store/reportStore.ts",
+      "target": "concept:state-management",
+      "relation": "belongs-to",
+      "label": "属于状态管理层"
+    },
+    {
+      "source": "frontend/src/store/patientStore.ts",
+      "target": "concept:state-management",
+      "relation": "belongs-to",
+      "label": "属于状态管理层"
+    },
+    {
+      "source": "frontend/src/store/editStore.ts",
+      "target": "concept:state-management",
+      "relation": "belongs-to",
+      "label": "属于状态管理层"
+    },
+    {
+      "source": "frontend/src/services/api.ts",
+      "target": "concept:api-layer",
+      "relation": "implements",
+      "label": "实现 API 通信层"
+    },
+    {
+      "source": "frontend/src/services/api.ts",
+      "target": "concept:sse-stream",
+      "relation": "contributes",
+      "label": "提供 parseSSE 解析器"
+    },
+    {
+      "source": "frontend/src/hooks/useChat.ts",
+      "target": "concept:sse-stream",
+      "relation": "implements",
+      "label": "实现 SSE 流式连接管理"
+    },
+    {
+      "source": "frontend/src/hooks/useChat.ts",
+      "target": "concept:api-layer",
+      "relation": "depends-on",
+      "label": "依赖 API 层的 parseSSE"
+    },
+    {
+      "source": "frontend/src/components/common/MarkdownRenderer.tsx",
+      "target": "concept:rich-text",
+      "relation": "implements",
+      "label": "实现富文本渲染管线"
+    },
+    {
+      "source": "frontend/src/components/common/ErrorBoundary.tsx",
+      "target": "concept:error-boundary",
+      "relation": "implements",
+      "label": "实现渲染错误边界"
+    },
+    {
+      "source": "frontend/vite.config.ts",
+      "target": "concept:build-config",
+      "relation": "implements",
+      "label": "实现构建与代理配置"
+    },
+    {
+      "source": "concept:layout",
+      "target": "concept:css-system",
+      "relation": "depends-on",
+      "label": "布局依赖 CSS 变量系统"
+    },
+    {
+      "source": "concept:sse-stream",
+      "target": "concept:api-layer",
+      "relation": "extends",
+      "label": "SSE 流式通信基于 API 层 HTTP 传输"
+    },
+    {
+      "source": "concept:report-system",
+      "target": "concept:type-system",
+      "relation": "depends-on",
+      "label": "报告体系依赖全局类型定义"
+    },
+    {
+      "source": "concept:state-management",
+      "target": "concept:type-system",
+      "relation": "depends-on",
+      "label": "状态管理依赖全局类型定义"
+    }
+  ]
+}

@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 import yaml
 
 from DataCode.llm_callback import LLMCallTracker
+from DataCode.deep_agent import make_async_llm_http_client
 
 if TYPE_CHECKING:
     from DataCode.agent_manager import AgentManager
@@ -264,14 +265,18 @@ def _file_category_summary(files: list[dict]) -> str:
         name = str(file.get("name", ""))
         # 自动从文件路径提取父目录作为类别
         parts = name.replace("\\", "/").split("/")
-        if len(parts) >= 2:
+        if len(parts) >= 2 and not parts[-2].startswith("["):
             category = parts[-2]
+        elif len(parts) >= 2:
+            category = parts[-2].split("]")[-1].strip() or "OCR资料"
         else:
-            category = "资料"
+            category = "OCR资料" if file.get("content") else "资料"
         counts[category] = counts.get(category, 0) + 1
     if not counts:
         return "暂无可解析文件"
-    return "、".join(f"{key}{value}份" for key, value in counts.items())
+    total = len(files)
+    details = "、".join(f"{key}{value}份" for key, value in counts.items())
+    return f"共{total}份（{details}）"
 
 
 def _first_content_snippet(files: list[dict], limit: int = 160) -> str:
@@ -713,6 +718,8 @@ class SkillExecutor:
             "disabled": sorted(self._disabled_providers),
             "tab_timeout_s": LLM_TAB_TIMEOUT_SECONDS,
             "chat_timeout_s": LLM_CHAT_TIMEOUT_SECONDS,
+            "trust_env_proxy": os.environ.get("MEDAGENT_LLM_TRUST_ENV_PROXY", "").lower() in ("1", "true", "yes"),
+            "proxy_env_present": any(os.environ.get(k) for k in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")),
         }
 
     # ── Skill 执行 ──
@@ -941,6 +948,7 @@ class SkillExecutor:
             api_key=api_key or "dummy",
             base_url=base_url or None,
             default_headers={"User-Agent": "curl/8.17.0"},
+            http_client=make_async_llm_http_client(),
         )
 
         async def _do_stream() -> AsyncIterator[dict]:
@@ -1230,6 +1238,10 @@ class SkillExecutor:
             "total_elapsed_s": round(total_elapsed, 2),
             "steps": step_timings,
             "total_files": len(files),
+            "successful_report_steps": sum(
+                1 for item in step_timings
+                if item.get("step") in _STEP_TO_TAB and item.get("status") in ("ok", "markdown")
+            ),
         }
         logger.info(
             "Pipeline completed patient=%s total=%.1fs steps=%d files=%d",
@@ -1268,12 +1280,22 @@ class SkillExecutor:
                     encoding="utf-8",
                 )
                 logger.info("Report saved: %s (%d tabs)", report_file, len(report_for_save))
-                self._write_generated_report_context(
-                    patient_id=patient_id,
-                    report=report_for_save,
-                    visit_date=visit_date,
-                    patient_dir=patient_dir or str(_Path(_res_app_state.get("patients_dir", "TempData/patients")) / patient_id),
-                )
+                successful_tabs = [
+                    tab for tab, data in report_for_save.items()
+                    if isinstance(data, dict) and data.get("status") not in ("fallback", "error")
+                ]
+                if successful_tabs:
+                    self._write_generated_report_context(
+                        patient_id=patient_id,
+                        report=report_for_save,
+                        visit_date=visit_date,
+                        patient_dir=patient_dir or str(_Path(_res_app_state.get("patients_dir", "TempData/patients")) / patient_id),
+                    )
+                else:
+                    logger.warning(
+                        "Skip generated report context archive for %s visit_date=%s: no successful report tabs",
+                        patient_id, visit_date,
+                    )
             except Exception:
                 logger.exception("Failed to save report for %s", patient_id)
 

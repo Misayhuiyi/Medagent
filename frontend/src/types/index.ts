@@ -3,6 +3,11 @@
 export interface PatientEncounter {
   admission: string
   discharge: string
+  type?: string
+  label?: string
+  source_admission?: string
+  file_count?: number
+  prior_report_count?: number
 }
 
 export interface Patient {
@@ -46,6 +51,9 @@ export interface MessageRequest {
 export interface EncounterFilter {
   admission: string
   discharge: string
+  type?: string
+  label?: string
+  source_admission?: string
 }
 
 // ── SSE 事件（判别联合） ──
@@ -270,6 +278,8 @@ export interface PredictionData {
     rows: string[][]
   }
   prognosis: PrognosisData
+  adaptive_prediction_summary?: unknown
+  adaptive_monitoring_plan?: unknown
   disclaimer?: string
 }
 

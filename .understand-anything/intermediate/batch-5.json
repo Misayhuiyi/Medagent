@@ -1,0 +1,961 @@
+{
+  "nodes": [
+    {
+      "id": "ReportPanel/index.tsx",
+      "kind": "component",
+      "label": "报告主面板",
+      "description": "报告面板主入口组件，管理Tab切换、数据加载、编辑状态、三阶渲染策略（结构化 > Markdown > JSON）",
+      "group": "主组件",
+      "prose": "ReportPanel 是整个报告面板的核心协作者。它监听 selectedId 变化触发 fetchReport，将后端返回的原始数据通过 setReportData 分发到各 Tab。核心逻辑是 renderTabContent 函数实现的三阶降级渲染：优先检查结构化字段（STRUCTURED_KEYS 映射）→ 使用对应 Tab 组件 + FigmaReportCard + ECharts；次级使用 MarkdownRenderer 文本渲染；兜底显示空状态。它还内嵌 JSON 提取器 extractStructuredJsonFromText，用于从 AI 生成的 Markdown 正文中解析出结构化 JSON。编辑模式由 useEditStore 管理，支持 Tab 内联编辑。"
+    },
+    {
+      "id": "FigmaReportCard.tsx",
+      "kind": "component",
+      "label": "Figma风格报告卡片",
+      "description": "通用卡片容器组件，带SVG图标、标题栏、证据来源、追溯按钮、证据等级标签",
+      "group": "UI组件",
+      "prose": "FigmaReportCard 是整个报告面板的基础视觉单元。它接受 title、children、evidence、level、icon、tab 等 props，内部管理 TraceModal 的开关状态。ICON_PATHS 定义了 7 种 SVG 图标（history/overview/treatment/prediction/care/chart/file），通过 CardIcon 子组件渲染。卡片结构分 header（图标+标题）、body（自定义内容）、footer（证据文本+追溯按钮+等级标签）三段。追溯按钮点击后打开 TraceModal 进行知识库溯源查询。"
+    },
+    {
+      "id": "TabHistory.tsx",
+      "kind": "component",
+      "label": "患者病史标签页",
+      "description": "展示现病史时间线、肿瘤大小趋势图（ECharts）、既往史/过敏史/个人史/家族史卡片",
+      "group": "Tab组件",
+      "prose": "TabHistory 负责患者病史数据的可视化呈现。主要数据来源是 present_illness 对象中的 timeline 和 tumor_size_chart 字段。TimelineView 组件将时间线渲染为垂直时间轴，每个节点带彩色圆点（绿/蓝/红）和标题+描述。TumorSizeChart 使用 ReactECharts 绘制折线图，工具提示显示毫米单位。其他病史条目（既往史/过敏史等）通过 HistoryTextCard 包装为 FigmaReportCard。继承 textFormat.formatClinicalValue 做文本规范化。"
+    },
+    {
+      "id": "TabOverview.tsx",
+      "kind": "component",
+      "label": "患者概况标签页",
+      "description": "展示主诉、体格检查、辅助检查、AI肿瘤负荷（含病灶表格）、疗效评估、不良反应、ECOG评分、诊断总结",
+      "group": "Tab组件",
+      "prose": "TabOverview 整合了患者全方位的病情概况。核心视觉元素包括：LesionTable 表格展示病灶编号/位置/基线/当前/变化（变化值带颜色语义：绿色改善/红色恶化/灰色稳定）；AssessmentCard 彩色卡片用于 AI 肿瘤负荷（含 TNM 分期、结论、病灶列表）、AI 疗效评估（vs 基线/vs 上次/最佳疗效）、AI 不良反应评估（症状/体征/影像/检验）；OverviewTextCard 用于简单文本字段（主诉、体格检查、合并症）。诊断总结卡片支持结构化子字段和纯文本两种模式。"
+    },
+    {
+      "id": "TabTreatment.tsx",
+      "kind": "component",
+      "label": "治疗方案标签页",
+      "description": "展示治疗方案列表（含ScoreBar评分条）、不良反应处理、合并症处理、临床试验匹配卡片",
+      "group": "Tab组件",
+      "prose": "TabTreatment 以治疗决策支持为核心。PlanCard 是核心组件，展示方案名称、策略标签（维持/升阶/降阶/停药，各自映射不同颜色 Tag）、综合获益评分。ScoreBar 将疗效/不良反应/预后三项评分渲染为水平进度条（自动归一化到 0-1）。ClinicalTrial 卡片展示试验匹配状态（匹配/不匹配）。每张 PlanCard 独立管理自己的 TraceModal 开关状态。"
+    },
+    {
+      "id": "TabPrediction.tsx",
+      "kind": "component",
+      "label": "疗效预测标签页",
+      "description": "展示肿瘤趋势预测、不良反应概率预测（按CTCAE分级）、预后生存曲线（PFS/OS）",
+      "group": "Tab组件",
+      "prose": "TabPrediction 是数据可视化密度最高的标签页。包含三种 ECharts 图表：PredictionChart 多系列折线图用于肿瘤负荷趋势预测；AdverseChart 按 CTCAE 分级（1级/2级/3级）用不同颜色的面积图展示不良反应概率；SurvivalCurve 绘制 PFS 和 OS 双线对比。TextCard 展示自适应疗效预测摘要和监测计划。disclaimer 卡片以 Ⅱ 级证据等级展示模型限制说明。所有图表数据经过 chartData 模块的 normalizeMultiSeriesChart / normalizePairedSeries 归一化处理。"
+    },
+    {
+      "id": "TabCare.tsx",
+      "kind": "component",
+      "label": "其他建议标签页",
+      "description": "展示心理关怀、保健措施、中医药建议、护理建议卡片",
+      "group": "Tab组件",
+      "prose": "TabCare 是本批最简洁的 Tab 组件，仅包含 4 张 CareCard，分别渲染心理关怀、保健措施、中医药建议、护理建议。每张卡片统一使用 file 图标，通过 formatClinicalValue 做文本格式化。无图表、无交互逻辑。"
+    },
+    {
+      "id": "ClinicalText.tsx",
+      "kind": "component",
+      "label": "临床语义高亮组件",
+      "description": "对临床文本中的关键词进行颜色高亮标记（红/蓝/绿），支持重叠高亮去重",
+      "group": "UI组件",
+      "prose": "ClinicalText 组件将 _semantic_highlights 数组中的标记应用到临床文本段落中。核心算法 renderHighlighted 遍历所有高亮范围，按位置排序后使用贪心策略去除重叠区间（保留较长的优先），最终将文本分段为普通文本和 <mark> 标签。支持三种颜色：红色（clinical-mark--red）、蓝色（clinical-mark--blue）、绿色（clinical-mark--green），每种对应不同的 CSS 类。compact 属性控制紧凑模式。"
+    },
+    {
+      "id": "DownloadButton.tsx",
+      "kind": "component",
+      "label": "下载按钮组件",
+      "description": "提供报告生成触发和三种格式下载（PDF/Markdown/HTML），基于Antd Dropdown",
+      "group": "UI组件",
+      "prose": "DownloadButton 包含两个主要操作：生成报告按钮（调用 onGenerate 回调，期间显示 loading 状态）和下载下拉菜单（PDF/Markdown/HTML）。下载函数 downloadReport 通过 fetch 获取 Blob，解析 Content-Disposition 头提取文件名，创建临时 <a> 元素触发下载。使用 Antd message.loading 提供下载进度反馈。"
+    },
+    {
+      "id": "EditForm.tsx",
+      "kind": "component",
+      "label": "医生编辑表单",
+      "description": "基于Antd Form的Tab内容编辑界面，按字段类型自适应渲染Input/TextArea/InputNumber或嵌套表单",
+      "group": "UI组件",
+      "prose": "EditForm 提供报告数据的现场编辑能力。renderField 根据值类型分派不同控件：短字符串用 Input、长字符串（>80字符）用 TextArea、数字用 InputNumber、数组用可编辑 JSON 文本域、嵌套对象递归渲染子表单。所有变更通过 useEditStore.updateFormField 更新。支持按 Tab 隔离编辑数据。"
+    },
+    {
+      "id": "PipelineTiming.tsx",
+      "kind": "component",
+      "label": "流水线时序图",
+      "description": "调试面板，展示AI处理流水线的各步骤耗时、状态和占比进度条",
+      "group": "调试组件",
+      "prose": "PipelineTiming 是一个可折叠的调试组件，通过 /api/debug/pipeline API 获取最近一次流水线运行数据。以水平进度条展示每一步的耗时占比，颜色编码状态：绿色（ok）/橙色（fallback）/红色（error）。顶部摘要显示总步数和总耗时（格式化 X分Y秒）。仅在存在运行记录时渲染，否则返回 null。"
+    },
+    {
+      "id": "TraceModal.tsx",
+      "kind": "component",
+      "label": "证据溯源弹窗",
+      "description": "Modal弹窗，调用知识库追溯API展示匹配的证据片段及其来源/年份/证据等级",
+      "group": "UI组件",
+      "prose": "TraceModal 是报告卡片的追溯入口。通过 POST /api/kb/trace 发送 question、top_k、patient_id、tab 参数，后端检索知识库返回匹配结果。每条结果展示 source（来源）、year（年份）、evidence_level（证据等级，7+为Ⅰ级/5+为Ⅱ级/3+为Ⅲ级/其余Ⅳ级）、page（页码）和 content（Markdown 正文）。加载状态显示 Spin。无结果时显示友好提示。"
+    },
+    {
+      "id": "chartData.ts",
+      "kind": "utility",
+      "label": "图表数据归一化工具",
+      "description": "提供折线图/多系列/配对系列数据的解析、排序、归一化函数",
+      "group": "工具模块",
+      "prose": "chartData 是纯函数工具模块，不依赖任何 React/组件代码。核心函数包括：sortLabelsWithValues（按日期解析排序标签和值）、parseClinicalNumber（从临床文本中提取数值，支持 cm→mm 换算）、normalizePointChart（将点数组或 labels/values 对象归一化为标准格式）、normalizeMultiSeriesChart（多系列图表归一化，回退到点图模式）、normalizePairedSeries（双系列数据如 PFS/OS 归一化）。parseDateValue 支持中英文日期格式（年月日/./-）。"
+    },
+    {
+      "id": "textFormat.ts",
+      "kind": "utility",
+      "label": "临床文本格式化工具",
+      "description": "提供临床值的递归格式化输出，含字段名中英标签映射",
+      "group": "工具模块",
+      "prose": "textFormat 是纯函数工具模块。VALUE_LABELS 映射了 17 个常见字段 key 的中文标签（如 evidence→依据、conclusion→结论）。formatClinicalValue 递归处理任意类型的临床值：null/undefined 返回空字符串；数组递归 join；对象优先取 summary 字段，其次取 details 数组，最后展开 key-value 对（跳过 _ 开头的私有字段）。depth 参数控制不同层级的连接符（深层用分号，顶层用换行）。"
+    },
+    {
+      "id": "renderTabContent",
+      "kind": "function",
+      "label": "三阶渲染策略",
+      "description": "决定每个Tab内容的渲染方式：结构化组件 > Markdown > JSON兜底",
+      "group": "核心逻辑",
+      "prose": "renderTabContent 是 ReportPanel 中最重要的决策函数。接收 tab 名称、结构化组件和原始数据。它有三个渲染层级：第一层检查 STRUCTURED_KEYS 中该 Tab 对应字段是否存在于 data 中，若有则渲染结构化组件并附加 Markdown 附录（_content）；第二层检查 sanitizeReportMarkdown 清洗后的文本是否超过 50 字符且非纯 JSON，使用 MarkdownRenderer 渲染；第三层返回空状态提示。数据来源优先级：tabs[tab]（结构化数据）> tabContents[tab]（原始 AI 文本）。"
+    },
+    {
+      "id": "extractStructuredJsonFromText",
+      "kind": "function",
+      "label": "结构化JSON提取器",
+      "description": "从AI生成的Markdown文本中尝试提取结构化JSON对象",
+      "group": "核心逻辑",
+      "prose": "extractStructuredJsonFromText 尝试从三个来源提取 JSON：Markdown 代码块（```json）、结构化标记之后（完整结构化输出/JSON输出等）、纯文本首字符。findBalancedJson 辅助函数使用栈算法精确匹配花括号/方括号平衡。提取到候选 JSON 后尝试 JSON.parse，要求顶层为非数组对象。此函数用于增强后端包装对象中的嵌套数据提取。"
+    },
+    {
+      "id": "sanitizeReportMarkdown",
+      "kind": "function",
+      "label": "报告文本清洗器",
+      "description": "去除AI生成Markdown中的结构化标记、JSON代码块、步骤上下文注释等噪音",
+      "group": "核心逻辑",
+      "prose": "sanitizeReportMarkdown 清洗 AI 模型输出的原始文本，移除以下噪音：结构化输出标题标记（如完整结构化输出、合并输出JSON）、JSON代码块标记（```json, ```）、步骤上下文注释（【当前步骤上下文）、子Skill输出文件提示、执行完毕通知、整合提示。同时合并多余的换行符（3+→2）。"
+    },
+    {
+      "id": "normalizeTabData",
+      "kind": "function",
+      "label": "中英文字段名归一化",
+      "description": "将中文键名映射为标准英文字段名，确保结构化数据一致性",
+      "group": "核心逻辑",
+      "prose": "normalizeTabData 使用 CHINESE_TO_ENGLISH 映射表（21对中英映射）将中文键名转换为标准英文字段名，仅在英文键不存在时进行转换。覆盖现病史、既往史、主诉、诊断、治疗方案、预测等所有 Tab 的关键字段。"
+    },
+    {
+      "id": "IconType",
+      "kind": "type",
+      "label": "图标类型枚举",
+      "description": "7种FigmaReportCard支持的SVG图标类型：history/overview/treatment/prediction/care/chart/file",
+      "group": "类型定义"
+    },
+    {
+      "id": "FigmaReportCardProps",
+      "kind": "interface",
+      "label": "报告卡片Props接口",
+      "description": "定义FigmaReportCard的title/children/evidence/level/icon/className/tab属性",
+      "group": "类型定义"
+    },
+    {
+      "id": "StepTiming",
+      "kind": "interface",
+      "label": "流水线步骤时序接口",
+      "description": "定义流水线步骤的step/display_name/elapsed_s/status/error字段",
+      "group": "类型定义"
+    },
+    {
+      "id": "PipelineRun",
+      "kind": "interface",
+      "label": "流水线运行接口",
+      "description": "定义patient_id/timestamp/total_elapsed_s/steps/total_files字段",
+      "group": "类型定义"
+    },
+    {
+      "id": "TraceResult",
+      "kind": "interface",
+      "label": "溯源结果接口",
+      "description": "定义溯源记录source/content/page/evidence_level/year字段",
+      "group": "类型定义"
+    },
+    {
+      "id": "ChartSeries",
+      "kind": "type",
+      "label": "图表系列数据类型",
+      "description": "定义name+values数组的图表系列结构",
+      "group": "类型定义"
+    },
+    {
+      "id": "MultiSeriesChart",
+      "kind": "type",
+      "label": "多系列图表数据",
+      "description": "定义labels+series数组的多系列图表结构",
+      "group": "类型定义"
+    },
+    {
+      "id": "usePatientStore",
+      "kind": "store",
+      "label": "患者状态Store",
+      "description": "Zustand store，管理selectedId等患者选择状态",
+      "group": "外部依赖"
+    },
+    {
+      "id": "useReportStore",
+      "kind": "store",
+      "label": "报告状态Store",
+      "description": "Zustand store，管理tabs/tabContents/activeTab等报告数据状态",
+      "group": "外部依赖"
+    },
+    {
+      "id": "useEditStore",
+      "kind": "store",
+      "label": "编辑状态Store",
+      "description": "Zustand store，管理isEditing/formData/startEdit/cancelEdit/saveEdit/updateFormField",
+      "group": "外部依赖"
+    },
+    {
+      "id": "useChatStore",
+      "kind": "store",
+      "label": "聊天状态Store",
+      "description": "Zustand store，管理isStreaming等聊天会话状态",
+      "group": "外部依赖"
+    },
+    {
+      "id": "fetchReport",
+      "kind": "api",
+      "label": "报告获取API",
+      "description": "API服务函数，通过selectedId获取完整报告数据",
+      "group": "外部依赖"
+    },
+    {
+      "id": "saveReport",
+      "kind": "api",
+      "label": "报告保存API",
+      "description": "API服务函数，持久化编辑后的报告数据",
+      "group": "外部依赖"
+    },
+    {
+      "id": "getDownloadUrl",
+      "kind": "api",
+      "label": "下载URL生成API",
+      "description": "API服务函数，生成指定格式（md/html/pdf）的下载URL",
+      "group": "外部依赖"
+    },
+    {
+      "id": "TAB_ORDER",
+      "kind": "constant",
+      "label": "Tab顺序常量",
+      "description": "定义Tab标签页的排列顺序常量",
+      "group": "外部依赖"
+    },
+    {
+      "id": "TAB_LABELS",
+      "kind": "constant",
+      "label": "Tab中文标签",
+      "description": "Tab名称到中文标签的映射常量",
+      "group": "外部依赖"
+    },
+    {
+      "id": "useChat",
+      "kind": "hook",
+      "label": "聊天Hook",
+      "description": "自定义Hook，提供generateReport方法驱动AI报告生成",
+      "group": "外部依赖"
+    },
+    {
+      "id": "MarkdownRenderer",
+      "kind": "component",
+      "label": "Markdown渲染器（通用）",
+      "description": "通用Markdown转React组件渲染器，用于报告文本降级渲染和溯源内容展示",
+      "group": "外部组件"
+    },
+    {
+      "id": "ErrorBoundary",
+      "kind": "component",
+      "label": "错误边界（通用）",
+      "description": "通用错误边界组件，包裹每个Tab防止单个Tab崩溃影响整个面板",
+      "group": "外部组件"
+    },
+    {
+      "id": "ReactECharts",
+      "kind": "library",
+      "label": "ECharts React封装",
+      "description": "echarts-for-react库，提供React风格的ECharts图表渲染",
+      "group": "外部依赖"
+    },
+    {
+      "id": "Antd",
+      "kind": "library",
+      "label": "Ant Design组件库",
+      "description": "Button/Tooltip/Tag/Modal/Spin/Form/Input/InputNumber/Dropdown/Table 等UI组件",
+      "group": "外部依赖"
+    },
+    {
+      "id": "STRUCTURED_KEYS",
+      "kind": "config",
+      "label": "结构化字段映射表",
+      "description": "每个Tab对应的结构化字段键列表，用于判定是否使用结构化组件渲染",
+      "group": "核心配置"
+    },
+    {
+      "id": "CHINESE_TO_ENGLISH",
+      "kind": "config",
+      "label": "中英文键名映射表",
+      "description": "21对中文→英文字段名映射，支持后端返回中文键名的兼容",
+      "group": "核心配置"
+    },
+    {
+      "id": "VALUE_LABELS",
+      "kind": "config",
+      "label": "字段中文标签映射",
+      "description": "17个临床字段key到中文显示标签的映射（如evidence→依据、conclusion→结论）",
+      "group": "核心配置"
+    },
+    {
+      "id": "COLOR_MAP",
+      "kind": "config",
+      "label": "时间轴颜色映射",
+      "description": "TabHistory中时间轴圆点的颜色映射：green→#34c759, blue→#0071e3, red→#ff3b30",
+      "group": "核心配置"
+    },
+    {
+      "id": "STRATEGY_COLORS",
+      "kind": "config",
+      "label": "治疗策略颜色映射",
+      "description": "TabTreatment中方案策略的颜色映射：维持→蓝, 升阶→橙, 降阶→绿, 停药→红",
+      "group": "核心配置"
+    },
+    {
+      "id": "三级渲染策略",
+      "kind": "concept",
+      "label": "三级渲染策略",
+      "description": "结构化 > Markdown > JSON 的三级降级渲染策略，保证数据兼容性和展示质量",
+      "group": "架构模式"
+    },
+    {
+      "id": "状态驱动的数据流",
+      "kind": "concept",
+      "label": "状态驱动的数据流",
+      "description": "基于 Zustand 的响应式数据流：患者选择→报告获取→Tab分发→组件渲染",
+      "group": "架构模式"
+    },
+    {
+      "id": "evidence-trace-pattern",
+      "kind": "concept",
+      "label": "证据溯源模式",
+      "description": "每个FigmaReportCard通过 TraceModal 实现可追溯的医学证据链路",
+      "group": "架构模式"
+    },
+    {
+      "id": "component-fallback-pattern",
+      "kind": "concept",
+      "label": "组件降级模式",
+      "description": "从FigmaReportCard+ECharts到MarkdownRenderer到空状态的逐级降级",
+      "group": "架构模式"
+    },
+    {
+      "id": "EditForm",
+      "kind": "function",
+      "label": "编辑表单递归渲染",
+      "description": "renderField根据值类型递归选择控件：string→Input/TextArea、number→InputNumber、array→JSON编辑、object→嵌套表单",
+      "group": "Tab组件"
+    }
+  ],
+  "edges": [
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "TabHistory.tsx",
+      "kind": "imports",
+      "label": "导入历史Tab组件"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "TabOverview.tsx",
+      "kind": "imports",
+      "label": "导入概况Tab组件"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "TabTreatment.tsx",
+      "kind": "imports",
+      "label": "导入治疗Tab组件"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "TabPrediction.tsx",
+      "kind": "imports",
+      "label": "导入预测Tab组件"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "TabCare.tsx",
+      "kind": "imports",
+      "label": "导入关怀Tab组件"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "EditForm.tsx",
+      "kind": "imports",
+      "label": "导入编辑表单"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "DownloadButton.tsx",
+      "kind": "imports",
+      "label": "导入下载按钮"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "PipelineTiming.tsx",
+      "kind": "imports",
+      "label": "导入流水线时序"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "MarkdownRenderer",
+      "kind": "imports",
+      "label": "导入Markdown渲染器"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "ErrorBoundary",
+      "kind": "imports",
+      "label": "导入错误边界"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "usePatientStore",
+      "kind": "uses-store",
+      "label": "读取患者选择ID"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "useReportStore",
+      "kind": "uses-store",
+      "label": "管理Tab数据和活动Tab"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "useEditStore",
+      "kind": "uses-store",
+      "label": "管理编辑状态和表单数据"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "useChatStore",
+      "kind": "uses-store",
+      "label": "读取流式生成状态"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "fetchReport",
+      "kind": "calls-api",
+      "label": "获取报告数据"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "saveReport",
+      "kind": "calls-api",
+      "label": "保存编辑后的报告"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "useChat",
+      "kind": "uses-hook",
+      "label": "使用聊天Hook生成报告"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "TAB_ORDER",
+      "kind": "uses-config",
+      "label": "使用Tab排列顺序"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "TAB_LABELS",
+      "kind": "uses-config",
+      "label": "使用Tab中文标签"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "renderTabContent",
+      "kind": "defines-function",
+      "label": "定义三阶渲染决策函数"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "extractStructuredJsonFromText",
+      "kind": "defines-function",
+      "label": "定义结构化JSON提取器"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "sanitizeReportMarkdown",
+      "kind": "defines-function",
+      "label": "定义报告文本清洗函数"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "normalizeTabData",
+      "kind": "defines-function",
+      "label": "定义中英键名归一化函数"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "STRUCTURED_KEYS",
+      "kind": "uses-config",
+      "label": "结构化字段表用于判定渲染策略"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "CHINESE_TO_ENGLISH",
+      "kind": "uses-config",
+      "label": "映射表用于字段名归一化"
+    },
+    {
+      "source": "renderTabContent",
+      "target": "三级渲染策略",
+      "kind": "implements",
+      "label": "具体实现三级降级渲染"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "FigmaReportCard.tsx",
+      "kind": "imports",
+      "label": "导入卡片容器"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "textFormat.ts",
+      "kind": "imports",
+      "label": "导入文本格式化"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "chartData.ts",
+      "kind": "imports",
+      "label": "导入图表数据工具"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "ReactECharts",
+      "kind": "imports",
+      "label": "导入ECharts封装"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "COLOR_MAP",
+      "kind": "uses-config",
+      "label": "时间轴颜色映射"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "normalizePointChart",
+      "kind": "calls-utility",
+      "label": "归一化肿瘤大小点图数据"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "sortLabelsWithValues",
+      "kind": "calls-utility",
+      "label": "按日期排序时间轴数据"
+    },
+    {
+      "source": "TabOverview.tsx",
+      "target": "FigmaReportCard.tsx",
+      "kind": "imports",
+      "label": "导入卡片容器"
+    },
+    {
+      "source": "TabOverview.tsx",
+      "target": "textFormat.ts",
+      "kind": "imports",
+      "label": "导入文本格式化"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "FigmaReportCard.tsx",
+      "kind": "imports",
+      "label": "导入卡片容器"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "TraceModal.tsx",
+      "kind": "imports",
+      "label": "直接导入溯源弹窗（用于PlanCard独立追溯）"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "textFormat.ts",
+      "kind": "imports",
+      "label": "导入文本格式化"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "STRATEGY_COLORS",
+      "kind": "uses-config",
+      "label": "治疗策略颜色映射"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "FigmaReportCard.tsx",
+      "kind": "imports",
+      "label": "导入卡片容器"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "textFormat.ts",
+      "kind": "imports",
+      "label": "导入文本格式化"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "chartData.ts",
+      "kind": "imports",
+      "label": "导入图表数据工具"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "ReactECharts",
+      "kind": "imports",
+      "label": "导入ECharts封装"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "normalizeMultiSeriesChart",
+      "kind": "calls-utility",
+      "label": "归一化肿瘤趋势预测数据"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "normalizePairedSeries",
+      "kind": "calls-utility",
+      "label": "归一化PFS/OS配对系列数据"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "sortLabelsWithValues",
+      "kind": "calls-utility",
+      "label": "不良反应标签排序"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "parseClinicalNumber",
+      "kind": "calls-utility",
+      "label": "解析临床数值"
+    },
+    {
+      "source": "TabCare.tsx",
+      "target": "FigmaReportCard.tsx",
+      "kind": "imports",
+      "label": "导入卡片容器"
+    },
+    {
+      "source": "TabCare.tsx",
+      "target": "textFormat.ts",
+      "kind": "imports",
+      "label": "导入文本格式化"
+    },
+    {
+      "source": "FigmaReportCard.tsx",
+      "target": "TraceModal.tsx",
+      "kind": "imports",
+      "label": "导入溯源弹窗"
+    },
+    {
+      "source": "FigmaReportCard.tsx",
+      "target": "usePatientStore",
+      "kind": "uses-store",
+      "label": "获取患者ID用于追溯"
+    },
+    {
+      "source": "TraceModal.tsx",
+      "target": "MarkdownRenderer",
+      "kind": "imports",
+      "label": "导入Markdown渲染器"
+    },
+    {
+      "source": "DownloadButton.tsx",
+      "target": "useChatStore",
+      "kind": "uses-store",
+      "label": "读取流式状态"
+    },
+    {
+      "source": "DownloadButton.tsx",
+      "target": "getDownloadUrl",
+      "kind": "calls-api",
+      "label": "获取下载URL"
+    },
+    {
+      "source": "EditForm.tsx",
+      "target": "useEditStore",
+      "kind": "uses-store",
+      "label": "更新表单字段"
+    },
+    {
+      "source": "PipelineTiming.tsx",
+      "target": "/api/debug/pipeline",
+      "kind": "calls-api",
+      "label": "调用流水线调试API"
+    },
+    {
+      "source": "TraceModal.tsx",
+      "target": "/api/kb/trace",
+      "kind": "calls-api",
+      "label": "调用知识库溯源API"
+    },
+    {
+      "source": "FigmaReportCard.tsx",
+      "target": "IconType",
+      "kind": "defines-type",
+      "label": "定义图标类型枚举"
+    },
+    {
+      "source": "FigmaReportCard.tsx",
+      "target": "FigmaReportCardProps",
+      "kind": "defines-interface",
+      "label": "定义Props接口"
+    },
+    {
+      "source": "chartData.ts",
+      "target": "ChartSeries",
+      "kind": "defines-type",
+      "label": "定义图表系列类型"
+    },
+    {
+      "source": "chartData.ts",
+      "target": "MultiSeriesChart",
+      "kind": "defines-type",
+      "label": "定义多系列图表类型"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "TimelineView",
+      "kind": "defines-component",
+      "label": "定义时间线子组件"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "TumorSizeChart",
+      "kind": "defines-component",
+      "label": "定义肿瘤大小图表子组件"
+    },
+    {
+      "source": "TabHistory.tsx",
+      "target": "HistoryTextCard",
+      "kind": "defines-component",
+      "label": "定义病史文本卡片子组件"
+    },
+    {
+      "source": "TabOverview.tsx",
+      "target": "LesionTable",
+      "kind": "defines-component",
+      "label": "定义病灶表格子组件"
+    },
+    {
+      "source": "TabOverview.tsx",
+      "target": "AssessmentCard",
+      "kind": "defines-component",
+      "label": "定义评估卡片子组件"
+    },
+    {
+      "source": "TabOverview.tsx",
+      "target": "EfficacyRow",
+      "kind": "defines-component",
+      "label": "定义疗效行子组件"
+    },
+    {
+      "source": "TabOverview.tsx",
+      "target": "OverviewTextCard",
+      "kind": "defines-component",
+      "label": "定义概况文本卡片子组件"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "PlanCard",
+      "kind": "defines-component",
+      "label": "定义治疗方案卡片子组件"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "ScoreBar",
+      "kind": "defines-component",
+      "label": "定义评分进度条子组件"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "TreatmentTextCard",
+      "kind": "defines-component",
+      "label": "定义治疗文本卡片子组件"
+    },
+    {
+      "source": "TabTreatment.tsx",
+      "target": "TrialCard",
+      "kind": "defines-component",
+      "label": "定义临床试验卡片子组件"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "PredictionChart",
+      "kind": "defines-component",
+      "label": "定义预测趋势图子组件"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "AdverseChart",
+      "kind": "defines-component",
+      "label": "定义不良反应图表子组件"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "SurvivalCurve",
+      "kind": "defines-component",
+      "label": "定义生存曲线子组件"
+    },
+    {
+      "source": "TabPrediction.tsx",
+      "target": "TextCard",
+      "kind": "defines-component",
+      "label": "定义预测文本卡片子组件"
+    },
+    {
+      "source": "TabCare.tsx",
+      "target": "CareCard",
+      "kind": "defines-component",
+      "label": "定义关怀卡片子组件"
+    },
+    {
+      "source": "PipelineTiming.tsx",
+      "target": "StepTiming",
+      "kind": "defines-interface",
+      "label": "定义步骤时序接口"
+    },
+    {
+      "source": "PipelineTiming.tsx",
+      "target": "PipelineRun",
+      "kind": "defines-interface",
+      "label": "定义流水线运行接口"
+    },
+    {
+      "source": "TraceModal.tsx",
+      "target": "TraceResult",
+      "kind": "defines-interface",
+      "label": "定义溯源结果接口"
+    },
+    {
+      "source": "ClinicalText.tsx",
+      "target": "highlightsFrom",
+      "kind": "defines-function",
+      "label": "定义高亮数据提取函数"
+    },
+    {
+      "source": "ClinicalText.tsx",
+      "target": "renderHighlighted",
+      "kind": "defines-function",
+      "label": "定义高亮文本渲染算法"
+    },
+    {
+      "source": "textFormat.ts",
+      "target": "VALUE_LABELS",
+      "kind": "uses-config",
+      "label": "字段中文标签映射"
+    },
+    {
+      "source": "evidence-trace-pattern",
+      "target": "TraceModal.tsx",
+      "kind": "realized-by",
+      "label": "证据溯源模式由TraceModal实现"
+    },
+    {
+      "source": "component-fallback-pattern",
+      "target": "renderTabContent",
+      "kind": "realized-by",
+      "label": "组件降级由renderTabContent实现"
+    },
+    {
+      "source": "状态驱动的数据流",
+      "target": "usePatientStore",
+      "kind": "orchestrates",
+      "label": "数据流始于患者选择"
+    },
+    {
+      "source": "状态驱动的数据流",
+      "target": "useReportStore",
+      "kind": "orchestrates",
+      "label": "报告Store承载核心数据"
+    },
+    {
+      "source": "状态驱动的数据流",
+      "target": "useEditStore",
+      "kind": "orchestrates",
+      "label": "编辑Store管理编辑状态"
+    },
+    {
+      "source": "clinicalText渲染算法",
+      "target": "ClinicalText.tsx",
+      "kind": "implemented-by",
+      "label": "高亮算法由ClinicalText实现"
+    },
+    {
+      "source": "sortLabelsWithValues",
+      "target": "parseDateValue",
+      "kind": "calls-utility",
+      "label": "按日期解析排序"
+    },
+    {
+      "source": "normalizeMultiSeriesChart",
+      "target": "normalizePointChart",
+      "kind": "calls-utility",
+      "label": "回退到点图归一化"
+    },
+    {
+      "source": "normalizeMultiSeriesChart",
+      "target": "sortLabelsWithValues",
+      "kind": "calls-utility",
+      "label": "排序图表标签"
+    },
+    {
+      "source": "normalizePairedSeries",
+      "target": "sortLabelsWithValues",
+      "kind": "calls-utility",
+      "label": "排序配对系列标签"
+    },
+    {
+      "source": "normalizePointChart",
+      "target": "parseClinicalNumber",
+      "kind": "calls-utility",
+      "label": "解析临床测量值"
+    },
+    {
+      "source": "normalizePointChart",
+      "target": "sortLabelsWithValues",
+      "kind": "calls-utility",
+      "label": "排序点图标签"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "EvidenceTracePattern",
+      "kind": "uses-pattern",
+      "label": "整体采用证据溯源架构"
+    },
+    {
+      "source": "ReportPanel/index.tsx",
+      "target": "component-fallback-pattern",
+      "kind": "uses-pattern",
+      "label": "整体采用组件降级架构"
+    },
+    {
+      "source": "FigmaReportCard.tsx",
+      "target": "evidence-trace-pattern",
+      "kind": "implements",
+      "label": "图例卡片实现了追溯入口"
+    },
+    {
+      "source": "chartData.ts",
+      "target": "textFormat.ts",
+      "kind": "no-direct-dependency",
+      "label": "无直接依赖（同层工具模块）"
+    }
+  ]
+}

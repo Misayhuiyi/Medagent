@@ -7,8 +7,35 @@ const COLOR_CLASS: Record<SemanticHighlight['color'], string> = {
   green: 'clinical-mark clinical-mark--green',
 }
 
+const AUTO_TERMS: Record<SemanticHighlight['color'], string[]> = {
+  red: [
+    '免疫检查点抑制相关肺炎', '免疫相关性肺炎', '肺泡蛋白沉积症', '炎症后肺纤维化',
+    '不良反应', '毒副反应', '肺炎', '间质性炎症', '间质性肺病', '肺纤维化',
+    '气胸', '咯血', '发热', '感染', '高血糖', '肝功能异常', '风险', '禁忌', '警惕', '恶化',
+  ],
+  blue: [
+    '左肺腺癌', '肺恶性肿瘤', '肿瘤负荷', '原发灶', '靶病灶', '肿瘤', '病灶', '结节',
+    '分期', '复发', '进展', '转移', '淋巴结', 'KRAS G12C', 'KRAS', 'TP53', 'PD-L1', 'PDL1', 'TMB', 'RECIST', 'CT', 'PET-CT',
+  ],
+  green: [
+    '新辅助治疗', '辅助治疗', '维持治疗', '抗血管生成', '靶向治疗', '免疫治疗',
+    '治疗', '疗效', '缓解', '缩小', '稳定', '改善', '随访', '复查', '手术',
+    '化疗', '培美曲塞', '卡铂', '信迪利单抗', '贝伐珠单抗', '索托拉西布', '阿达格拉西布', '康复', '护理', '监测',
+  ],
+}
+
 export function highlightsFrom(data?: SemanticHighlightCarrier): SemanticHighlight[] {
   return Array.isArray(data?._semantic_highlights) ? data._semantic_highlights : []
+}
+
+export function autoHighlights(text: string): SemanticHighlight[] {
+  const found: SemanticHighlight[] = []
+  for (const [color, terms] of Object.entries(AUTO_TERMS) as Array<[SemanticHighlight['color'], string[]]>) {
+    for (const term of terms) {
+      if (text.includes(term)) found.push({ text: term, color, reason: color === 'red' ? '不良反应/风险' : color === 'blue' ? '肿瘤负荷' : '治疗及疗效' })
+    }
+  }
+  return found
 }
 
 function renderHighlighted(text: string, highlights: SemanticHighlight[]): ReactNode[] {
@@ -61,6 +88,7 @@ export default function ClinicalText({
 }) {
   const value = text == null ? '' : String(text).trim()
   if (!value) return null
+  const effectiveHighlights = highlights.length ? highlights : autoHighlights(value)
 
   const paragraphs = value
     .split(/\n+/)
@@ -70,7 +98,7 @@ export default function ClinicalText({
   return (
     <div className={compact ? 'clinical-text clinical-text--compact' : 'clinical-text'}>
       {paragraphs.map((line, index) => (
-        <p key={`${line.slice(0, 24)}-${index}`}>{renderHighlighted(line, highlights)}</p>
+        <p key={`${line.slice(0, 24)}-${index}`}>{renderHighlighted(line, effectiveHighlights)}</p>
       ))}
     </div>
   )

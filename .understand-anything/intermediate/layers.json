@@ -1,0 +1,188 @@
+[
+  {
+    "id": "layer:backend-core",
+    "name": "后端核心层",
+    "description": "LangGraph ReAct Agent 运行时核心：Agent 生命周期管理、流水线执行引擎、工具注册与执行、LLM 回调追踪、MCP 协议连接、上下文压缩管理",
+    "nodeIds": [
+      "file:Code/DataCode/agent_manager.py",
+      "file:Code/DataCode/skill_executor.py",
+      "file:Code/DataCode/deep_agent.py",
+      "file:Code/DataCode/builtin_tools.py",
+      "file:Code/DataCode/tool_registry.py",
+      "file:Code/DataCode/execute_tool.py",
+      "file:Code/DataCode/llm_callback.py",
+      "Code/DataCode/context_manager.py",
+      "Code/DataCode/mcp_connector.py",
+      "Code/DataCode/skill_parser.py",
+      "Code/DataCode/_shared.py"
+    ]
+  },
+  {
+    "id": "layer:backend-support",
+    "name": "后端支持层",
+    "description": "后端基础设施模块：配置管理、记忆存储、待办管理、执行日志、统一日志配置、OCR 预处理、LLM 文本清洗、知识库 RAG 集成接口",
+    "nodeIds": [
+      "file:Code/DataCode/config_manager.py",
+      "Code/DataCode/memory_store.py",
+      "Code/DataCode/todo_manager.py",
+      "Code/DataCode/execution_logger.py",
+      "Code/DataCode/log_setup.py",
+      "Code/DataCode/pdf_ocr.py",
+      "Code/DataCode/text_cleaner.py",
+      "Code/DataCode/knowledge_base.py"
+    ]
+  },
+  {
+    "id": "layer:api-routes",
+    "name": "Web 路由层",
+    "description": "FastAPI REST API 路由：SSE 流式对话、患者 CRUD、报告 CRUD、知识库追溯、调试接口、Web 服务器初始化",
+    "nodeIds": [
+      "file:web_routes/__init__.py",
+      "file:web_routes/chat.py",
+      "file:web_routes/patients.py",
+      "file:web_routes/reports.py",
+      "file:web_routes/kb.py",
+      "file:web_routes/debug.py",
+      "Code/DataCode/web_server.py"
+    ]
+  },
+  {
+    "id": "layer:report-engine",
+    "name": "报告引擎层",
+    "description": "V4 门诊报告渲染管道：Tab 数据归一化、HTML/CSS 模板、浏览器 PDF 渲染、多格式报告生成引擎、跨就诊病历上下文管理",
+    "nodeIds": [
+      "file:reporting/normalizer.py",
+      "file:reporting/pdf_renderer_v4.py",
+      "file:reporting/template_v4.py",
+      "Code/DataCode/report_generator.py",
+      "Code/DataCode/report_context.py",
+      "file:scripts/batch_pdf_to_md.py"
+    ]
+  },
+  {
+    "id": "layer:knowledge-base",
+    "name": "知识库层",
+    "description": "ChromaDB 医学知识库：索引构建与增量更新、向量检索与混合排序、CrossEncoder 重排序、证据等级体系、Function Calling 封装",
+    "nodeIds": [
+      "file-tool-py",
+      "file-kb-manager-py",
+      "file-agent-py",
+      "file-build-page-map-py"
+    ]
+  },
+  {
+    "id": "layer:entry-point",
+    "name": "入口层",
+    "description": "应用主入口：Web/CLI/Blank 三种运行模式分发、组件初始化与依赖注入",
+    "nodeIds": [
+      "file-main-py"
+    ]
+  },
+  {
+    "id": "layer:frontend-core",
+    "name": "前端核心层",
+    "description": "React 19 + TypeScript 应用骨架：入口挂载、三栏布局外壳、全局类型系统、Zustand 状态管理、Axios API 通信、SSE 流式连接管理、Vite 构建配置",
+    "nodeIds": [
+      "frontend/src/main.tsx",
+      "frontend/src/App.tsx",
+      "frontend/src/aidoc.css",
+      "frontend/src/types/index.ts",
+      "frontend/src/store/index.ts",
+      "frontend/src/store/chatStore.ts",
+      "frontend/src/store/reportStore.ts",
+      "frontend/src/store/patientStore.ts",
+      "frontend/src/store/editStore.ts",
+      "frontend/src/services/api.ts",
+      "frontend/src/hooks/useChat.ts",
+      "frontend/src/components/common/MarkdownRenderer.tsx",
+      "frontend/src/components/common/ErrorBoundary.tsx",
+      "frontend/vite.config.ts",
+      "service-api"
+    ]
+  },
+  {
+    "id": "layer:frontend-report",
+    "name": "前端报告层",
+    "description": "结构化报告 UI 体系：报告主面板、5 个 Tab 标签页（病史/概况/治疗/预测/建议）、Figma 风格卡片、证据溯源弹窗、流水线时序调试、图表数据归一化与临床文本格式化",
+    "nodeIds": [
+      "ReportPanel/index.tsx",
+      "FigmaReportCard.tsx",
+      "TabHistory.tsx",
+      "TabOverview.tsx",
+      "TabTreatment.tsx",
+      "TabPrediction.tsx",
+      "TabCare.tsx",
+      "ClinicalText.tsx",
+      "DownloadButton.tsx",
+      "EditForm.tsx",
+      "PipelineTiming.tsx",
+      "TraceModal.tsx",
+      "chartData.ts",
+      "textFormat.ts"
+    ]
+  },
+  {
+    "id": "layer:frontend-components",
+    "name": "前端组件层",
+    "description": "三栏面板主组件：顶部导航栏 TopBar、左侧患者列表树 PatientList、中间对话面板 ChatPanel",
+    "nodeIds": [
+      "ext:TopBar",
+      "ext:PatientList",
+      "ext:ChatPanel"
+    ]
+  },
+  {
+    "id": "layer:configuration",
+    "name": "配置层",
+    "description": "系统配置体系：平台主配置、流水线步骤定义、运行时参数、环境变量、LLM 多候选路由、安全沙箱、证据等级映射、记忆缓存与自省机制、A2A 通信、MCP 服务",
+    "nodeIds": [
+      "config-platform-yaml",
+      "config-pipeline-yaml",
+      "config-params-txt",
+      "config-env",
+      "platform.yaml",
+      "pipeline.yaml",
+      "llm-config",
+      "sandbox",
+      "evidence-mapping",
+      "memory-context",
+      "caching",
+      "dreaming",
+      "a2a",
+      "mcp-local",
+      "workspace"
+    ]
+  },
+  {
+    "id": "layer:pipeline-definition",
+    "name": "流水线定义层",
+    "description": "10 步肺癌诊疗 AI 诊断流水线：资料整理、预处理、循环确定、场景判断、病史总结、患者概况、治疗方案、疗效预测、其他建议、报告生成",
+    "nodeIds": [
+      "pipeline-steps",
+      "step-1",
+      "step-2",
+      "step-3",
+      "step-4",
+      "step-5",
+      "step-6",
+      "step-7",
+      "step-8",
+      "step-9",
+      "step-10"
+    ]
+  },
+  {
+    "id": "layer:deployment",
+    "name": "部署层",
+    "description": "Docker 容器化部署：Python 3.13 容器映像、Docker Compose 服务编排、数据卷挂载、环境变量注入、第三方 API 密钥配置",
+    "nodeIds": [
+      "Dockerfile",
+      "docker-compose.yaml",
+      "python-base",
+      "medagent-service",
+      "volumes",
+      "env-vars",
+      "third-party-keys"
+    ]
+  }
+]

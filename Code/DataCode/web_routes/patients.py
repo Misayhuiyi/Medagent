@@ -9,6 +9,8 @@ from urllib.parse import unquote
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
+from DataCode.report_context import detect_patient_encounters
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/patients", tags=["patients"])
 
@@ -45,55 +47,11 @@ async def list_patients():
             if not any(p == "ocr" for p in f.relative_to(d).parts)
         ]
         pdf_count = len(pdfs)
-        import re
-        date_pattern = re.compile(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})')
-        _FILE_DATE_RE = re.compile(r'(\d{4})-(\d{2})-(\d{2})')
-        # 收集每个OCR文件的就诊日期，优先文件名日期，备用内容最早日期
-        file_dates: list[str] = []
-        for md_file in sorted(d.rglob("ocr/*.md")):
-            try:
-                # 1. 优先从文件名提取日期（如 2023-12-05_入院记录.md → 2023-12-05）
-                stem = md_file.stem  # "2023-12-05_入院记录"
-                file_date = None
-                for m in _FILE_DATE_RE.finditer(stem):
-                    y, mo, dy = m.group(1), m.group(2), m.group(3)
-                    if 2020 <= int(y) <= 2030:
-                        file_date = f"{y}-{mo}-{dy}"
-                        break
-                # 2. 文件名无日期时回退到内容
-                if not file_date:
-                    content = md_file.read_text(encoding="utf-8", errors="replace")[:2000]
-                    earliest = None
-                    for m in date_pattern.finditer(content):
-                        y, mo, dy = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
-                        y_int = int(y)
-                        if 2020 <= y_int <= 2030:
-                            d_str = f"{y}-{mo}-{dy}"
-                            if earliest is None or d_str < earliest:
-                                earliest = d_str
-                    file_date = earliest
-                if file_date:
-                    file_dates.append(file_date)
-            except Exception:
-                continue
-
-        # 按日期分组: 间隔>45天视为不同次就诊
-        encounters: list[dict] = []
-        if file_dates:
-            file_dates.sort()
-            cur_enc = {"admission": file_dates[0], "discharge": file_dates[0]}
-            for date_str in file_dates[1:]:
-                prev = datetime.strptime(cur_enc["discharge"], "%Y-%m-%d")
-                cur = datetime.strptime(date_str, "%Y-%m-%d")
-                if (cur - prev).days <= 45:
-                    cur_enc["discharge"] = date_str
-                else:
-                    encounters.append(cur_enc)
-                    cur_enc = {"admission": date_str, "discharge": date_str}
-            encounters.append(cur_enc)
-            for enc in encounters:
-                if enc["admission"] == enc["discharge"]:
-                    enc["discharge"] = ""
+        try:
+            encounters = detect_patient_encounters(d)
+        except Exception:
+            logger.exception("Failed to detect encounters for patient=%s", d.name)
+            encounters = []
 
         date = encounters[0]["admission"] if encounters else ""
         discharge_date = encounters[-1]["discharge"] if encounters and len(encounters) == 1 else ""

@@ -1,0 +1,341 @@
+{
+  "nodes": [
+    {
+      "id": "platform.yaml",
+      "label": "平台配置文件",
+      "type": "config",
+      "file": "Data/platform.yaml"
+    },
+    {
+      "id": "pipeline.yaml",
+      "label": "流水线配置文件",
+      "type": "config",
+      "file": "Data/skills/pipeline.yaml"
+    },
+    {
+      "id": "Dockerfile",
+      "label": "Docker 容器映像定义",
+      "type": "infrastructure",
+      "file": "Docker/Dockerfile"
+    },
+    {
+      "id": "docker-compose.yaml",
+      "label": "Docker Compose 服务编排",
+      "type": "infrastructure",
+      "file": "Docker/docker-compose.yaml"
+    },
+    {
+      "id": "llm-config",
+      "label": "LLM 配置 (DeepSeek V4)",
+      "type": "config",
+      "subsystem": "AI平台"
+    },
+    {
+      "id": "sandbox",
+      "label": "安全沙箱 (命令/网络黑名单)",
+      "type": "config",
+      "subsystem": "安全"
+    },
+    {
+      "id": "evidence-mapping",
+      "label": "临床指南证据等级映射",
+      "type": "config",
+      "subsystem": "医疗知识"
+    },
+    {
+      "id": "memory-context",
+      "label": "记忆与上下文管理",
+      "type": "config",
+      "subsystem": "AI平台"
+    },
+    {
+      "id": "caching",
+      "label": "提示词缓存系统",
+      "type": "config",
+      "subsystem": "AI平台"
+    },
+    {
+      "id": "dreaming",
+      "label": "Dreaming 定时自省机制",
+      "type": "config",
+      "subsystem": "AI平台"
+    },
+    {
+      "id": "a2a",
+      "label": "A2A 智能体间通信",
+      "type": "config",
+      "subsystem": "AI平台"
+    },
+    {
+      "id": "mcp-local",
+      "label": "MCP 本地服务",
+      "type": "config",
+      "subsystem": "AI平台"
+    },
+    {
+      "id": "workspace",
+      "label": "工作空间路径配置",
+      "type": "config",
+      "subsystem": "基础"
+    },
+    {
+      "id": "python-base",
+      "label": "Python 3.13-slim 基础映像",
+      "type": "infrastructure",
+      "subsystem": "运行时"
+    },
+    {
+      "id": "medagent-service",
+      "label": "medagent 肺癌门诊服务",
+      "type": "infrastructure",
+      "subsystem": "服务"
+    },
+    {
+      "id": "pipeline-steps",
+      "label": "10步诊断流水线",
+      "type": "pipeline",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-1",
+      "label": "Step 1: 资料整理",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-2",
+      "label": "Step 2: 资料预处理",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-3",
+      "label": "Step 3: 循环次数确定",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-4",
+      "label": "Step 4: 场景判断",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-5",
+      "label": "Step 5: 患者病史总结",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-6",
+      "label": "Step 6: 患者概况",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-7",
+      "label": "Step 7: 治疗方案",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-8",
+      "label": "Step 8: 疗效预测",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-9",
+      "label": "Step 9: 其他建议",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "step-10",
+      "label": "Step 10: 生成报告",
+      "type": "skill",
+      "subsystem": "业务流程"
+    },
+    {
+      "id": "volumes",
+      "label": "数据卷挂载 (患者数据/结果/配置)",
+      "type": "infrastructure",
+      "subsystem": "存储"
+    },
+    {
+      "id": "env-vars",
+      "label": "环境变量注入 (API 密钥)",
+      "type": "infrastructure",
+      "subsystem": "安全"
+    },
+    {
+      "id": "deepseek-api",
+      "label": "DeepSeek API (外部)",
+      "type": "external",
+      "subsystem": "外部服务"
+    },
+    {
+      "id": "third-party-keys",
+      "label": "第三方 API 密钥占位 (ANTHROPIC/OPENAI/DASHSCOPE)",
+      "type": "infrastructure",
+      "subsystem": "安全"
+    }
+  ],
+  "edges": [
+    {
+      "source": "platform.yaml",
+      "target": "llm-config",
+      "label": "包含 LLM 配置"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "sandbox",
+      "label": "包含安全沙箱规则"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "evidence-mapping",
+      "label": "包含指南证据映射"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "memory-context",
+      "label": "包含记忆与上下文管理"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "caching",
+      "label": "包含缓存排序策略"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "dreaming",
+      "label": "包含 Dreaming 定时任务"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "a2a",
+      "label": "包含 A2A 协议开关"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "mcp-local",
+      "label": "包含 MCP 本地服务开关"
+    },
+    {
+      "source": "platform.yaml",
+      "target": "workspace",
+      "label": "包含工作空间根路径"
+    },
+    {
+      "source": "pipeline.yaml",
+      "target": "pipeline-steps",
+      "label": "定义 10 步流水线"
+    },
+    {
+      "source": "pipeline-steps",
+      "target": "step-1",
+      "label": "第 1 步"
+    },
+    {
+      "source": "step-1",
+      "target": "step-2",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-2",
+      "target": "step-3",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-3",
+      "target": "step-4",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-4",
+      "target": "step-5",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-5",
+      "target": "step-6",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-6",
+      "target": "step-7",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-7",
+      "target": "step-8",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-8",
+      "target": "step-9",
+      "label": "顺序执行"
+    },
+    {
+      "source": "step-9",
+      "target": "step-10",
+      "label": "顺序执行"
+    },
+    {
+      "source": "Dockerfile",
+      "target": "python-base",
+      "label": "基础映像"
+    },
+    {
+      "source": "Dockerfile",
+      "target": "platform.yaml",
+      "label": "打包平台配置"
+    },
+    {
+      "source": "Dockerfile",
+      "target": "pipeline.yaml",
+      "label": "打包流水线配置"
+    },
+    {
+      "source": "Dockerfile",
+      "target": "third-party-keys",
+      "label": "声明环境变量占位"
+    },
+    {
+      "source": "docker-compose.yaml",
+      "target": "medagent-service",
+      "label": "定义单一服务"
+    },
+    {
+      "source": "medagent-service",
+      "target": "Dockerfile",
+      "label": "基于 Dockerfile 构建"
+    },
+    {
+      "source": "medagent-service",
+      "target": "volumes",
+      "label": "挂载数据卷"
+    },
+    {
+      "source": "medagent-service",
+      "target": "env-vars",
+      "label": "注入运行时环境变量"
+    },
+    {
+      "source": "llm-config",
+      "target": "deepseek-api",
+      "label": "调用 DeepSeek V4 API"
+    },
+    {
+      "source": "pipeline-steps",
+      "target": "llm-config",
+      "label": "依赖 LLM 推理能力"
+    },
+    {
+      "source": "memory-context",
+      "target": "llm-config",
+      "label": "配合 LLM 上下文窗口"
+    }
+  ]
+}

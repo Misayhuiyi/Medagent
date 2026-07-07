@@ -49,8 +49,83 @@ function sanitizeReportMarkdown(content: string): string {
   return cleaned.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
+function findBalancedJson(text: string, startIndex: number): string | null {
+  const stack: string[] = []
+  let inString = false
+  let escaped = false
+  for (let i = startIndex; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (ch === '\\') {
+        escaped = true
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (ch === '"') {
+      inString = true
+    } else if (ch === '{' || ch === '[') {
+      stack.push(ch)
+    } else if (ch === '}' || ch === ']') {
+      const open = stack.pop()
+      if ((ch === '}' && open !== '{') || (ch === ']' && open !== '[')) return null
+      if (!stack.length) return text.slice(startIndex, i + 1)
+    }
+  }
+  return null
+}
+
+function extractStructuredJsonFromText(text: string): Record<string, unknown> | null {
+  if (!text) return null
+  const candidates: string[] = []
+  const fenced = text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)
+  for (const match of fenced) {
+    const candidate = match[1]?.trim()
+    if (candidate && /^[{[]/.test(candidate)) candidates.push(candidate)
+  }
+
+  const structuredMarkers = [
+    '完整结构化输出',
+    '合并输出JSON',
+    '结构化输出',
+    'JSON 输出',
+    'JSON输出',
+  ]
+  for (const marker of structuredMarkers) {
+    const markerIndex = text.indexOf(marker)
+    if (markerIndex < 0) continue
+    const startIndex = text.slice(markerIndex).search(/[{\[]/)
+    if (startIndex >= 0) {
+      const json = findBalancedJson(text, markerIndex + startIndex)
+      if (json) candidates.push(json)
+    }
+  }
+
+  const trimmed = text.trim()
+  if (/^[{[]/.test(trimmed)) {
+    const json = findBalancedJson(trimmed, 0)
+    if (json) candidates.push(json)
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      // ignore malformed model output and keep the Markdown fallback
+    }
+  }
+  return null
+}
+
 export default function ReportPanel() {
   const selectedId = usePatientStore((s) => s.selectedId)
+  const selectedEncounter = usePatientStore((s) => s.selectedEncounter)
   const tabs = useReportStore((s) => s.tabs)
   const tabContents = useReportStore((s) => s.tabContents)
   const activeTab = useReportStore((s) => s.activeTab)
@@ -73,7 +148,7 @@ export default function ReportPanel() {
     setReportLoadError('')
     if (selectedId) {
       setReportLoading(true)
-      fetchReport(selectedId)
+      fetchReport(selectedId, selectedEncounter?.admission)
         .then((data) => {
           if (!cancelled) setReportData(data)
         })
@@ -90,14 +165,14 @@ export default function ReportPanel() {
     return () => {
       cancelled = true
     }
-  }, [selectedId, setReportData, clearTabs])
+  }, [selectedId, selectedEncounter?.admission, setReportData, clearTabs])
 
   const handleSave = async () => {
     const formData = saveEdit()
     if (!selectedId) return
     try {
       const merged = { ...tabs, ...formData }
-      await saveReport(selectedId, merged)
+      await saveReport(selectedId, merged, selectedEncounter?.admission)
       setReportData(merged)
     } catch (err) {
       console.error('Failed to save report:', err)
@@ -109,6 +184,7 @@ export default function ReportPanel() {
     'patient-history': [
       'visit_count', 'present_illness', 'past_history', 'allergy_history', 'personal_history',
       'family_history', 'treatment_history', 'patient_info', 'lesion_numbering',
+      'timeline', 'tumor_size_chart', 'tumorSizeChart', 'tumorSize', 'tumor_size',
     ],
     'patient-overview': [
       'chief_complaint', 'physical_examination', 'auxiliary_examination', 'diagnosis',
@@ -139,6 +215,8 @@ export default function ReportPanel() {
     '临床试验': 'clinical_trials',
     '肿瘤预测': 'tumor_prediction', '不良反应预测': 'adverse_prediction', '预后': 'prognosis',
     '预后因素': 'prognostic_factors',
+    '时间线': 'timeline', '肿瘤大小趋势': 'tumor_size_chart', '肿瘤大小': 'tumor_size_chart',
+    '肿瘤尺寸': 'tumor_size_chart',
     '心理关怀': 'psychological_care', '健康措施': 'health_measures', '中医建议': 'tcm_suggestions',
     '护理': 'nursing_care', '随访': 'follow_up_plan',
   }
@@ -171,22 +249,19 @@ export default function ReportPanel() {
     // 尝试从 wrapper 对象（{step, result, _content}）中提取结构化数据
     // 将 result 字段作为 JSON 尝试解析，如果成功则合并到 record 中以供结构化检测
     const enhanceFromWrapper = () => {
-      const toTry = [record.result, record._content]
+      const toTry = [record.result, record._content, record.content]
       for (const val of toTry) {
         if (typeof val !== 'string') continue
-        const trimmed = val.trim()
-        if (trimmed.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(trimmed)
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              Object.assign(record, normalizeTabData(parsed))
-            }
-          } catch { /* not JSON */ }
+        const parsed = extractStructuredJsonFromText(val)
+        if (parsed) {
+          Object.assign(record, normalizeTabData(parsed))
         }
       }
     }
     // 仅当数据看起来是后端包装对象时才尝试提取
     if ('step' in record && Object.keys(record).length <= 5) {
+      enhanceFromWrapper()
+    } else if (typeof record._content === 'string' || typeof record.content === 'string' || typeof record.result === 'string') {
       enhanceFromWrapper()
     }
 
@@ -254,7 +329,7 @@ export default function ReportPanel() {
 
   const handleGenerate = async () => {
     if (!selectedId || isStreaming) return
-    await generateReport('请基于患者全部病历、检查报告和当前对话，生成患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。')
+    await generateReport('请基于当前选中时间点的患者资料，并结合此前时间点的既往报告，生成本时间点的患者病史、患者概况、治疗方案、疗效预测和其他建议，并更新右侧报告。', selectedEncounter)
   }
 
   if (!selectedId) {

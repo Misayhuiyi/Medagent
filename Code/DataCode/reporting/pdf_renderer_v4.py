@@ -23,13 +23,53 @@ def report_to_v4_html(report: dict, title: str, patient_info: dict | None = None
 
 def report_to_v4_pdf_bytes(report: dict, title: str, patient_info: dict | None = None) -> bytes:
     html = report_to_v4_html(report, title, patient_info)
+
+    # 优先 Playwright Chromium（与 old_MedAgent 方案一致，高保真 HTML/CSS PDF）
+    playwright_pdf = _html_to_pdf_with_playwright(html)
+    if playwright_pdf is not None:
+        return playwright_pdf
+
+    # 回退 Edge/Chrome 无头打印
     browser = _find_browser()
     if browser:
         return _html_to_pdf_with_browser(html, browser)
+
+    # 最后尝试 wkhtmltopdf
     wkhtmltopdf = _find_wkhtmltopdf()
     if wkhtmltopdf:
         return _html_to_pdf_with_wkhtmltopdf(html, wkhtmltopdf)
-    raise RuntimeError("未找到可用于 HTML 打印 PDF 的 Edge/Chrome/wkhtmltopdf")
+
+    raise RuntimeError("PDF 生成失败：未找到 Playwright/Edge/Chrome/wkhtmltopdf")
+
+
+def _html_to_pdf_with_playwright(html: str) -> bytes | None:
+    """使用 Playwright Chromium 生成高保真 PDF（与 old_MedAgent 方案一致）。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        logger.info("Playwright not installed, falling back to browser headless")
+        return None
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.set_content(html, timeout=30000)
+            # 等待字体和图表渲染
+            page.wait_for_timeout(500)
+            pdf_bytes = page.pdf(
+                format="A4",
+                print_background=True,
+                margin={"top": "12mm", "bottom": "12mm", "left": "10mm", "right": "10mm"},
+            )
+            browser.close()
+            if not pdf_bytes.startswith(b"%PDF-"):
+                logger.warning("Playwright output is not valid PDF, falling back")
+                return None
+            logger.info("Rendering V4 PDF via Playwright Chromium: %d bytes", len(pdf_bytes))
+            return pdf_bytes
+    except Exception as e:
+        logger.warning("Playwright PDF failed (%s), falling back to browser headless", e)
+        return None
 
 
 def _find_browser() -> str | None:
@@ -83,10 +123,14 @@ def _html_to_pdf_with_browser(html: str, browser_path: str) -> bytes:
             "--disable-gpu",
             "--disable-extensions",
             "--disable-background-networking",
+            "--disable-breakpad",
+            "--disable-crash-reporter",
             "--disable-component-update",
             "--disable-default-apps",
-            "--disable-features=OptimizationHints,Translate,MediaRouter,CalculateNativeWinOcclusion",
+            "--disable-features=OptimizationHints,Translate,MediaRouter,CalculateNativeWinOcclusion,Crashpad",
+            "--disable-crashpad-for-testing",
             "--disable-sync",
+            "--disable-logging",
             "--no-first-run",
             "--no-default-browser-check",
             f"--user-data-dir={profile_dir}",
@@ -169,9 +213,24 @@ def _html_to_pdf_with_wkhtmltopdf(html: str, executable: str) -> bytes:
 
 def _pdf_tmp_parent() -> Path:
     configured = os.environ.get("MEDAGENT_PDF_TMP_DIR", "")
-    parent = Path(configured) if configured else Path(tempfile.gettempdir()) / "medagent_pdf"
-    parent.mkdir(parents=True, exist_ok=True)
-    return parent
+    candidates = []
+    if configured:
+        candidates.append(Path(configured))
+    candidates.extend([
+        Path.cwd() / "Result" / "tmp" / "pdf",
+        Path(tempfile.gettempdir()) / "medagent_pdf",
+    ])
+    for parent in candidates:
+        try:
+            parent.mkdir(parents=True, exist_ok=True)
+            probe = parent / f".write_test_{os.getpid()}"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+            return parent
+        except OSError as exc:
+            logger.warning("PDF temp dir unavailable, trying fallback: %s (%s)", parent, exc)
+            continue
+    raise RuntimeError("无法创建可写 PDF 临时目录")
 
 
 def _make_pdf_tmp_dir() -> str:

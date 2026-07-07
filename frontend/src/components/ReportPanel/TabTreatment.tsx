@@ -5,6 +5,7 @@ import type { TreatmentData, TreatmentPlan, ClinicalTrial } from '../../types'
 import FigmaReportCard from './FigmaReportCard'
 import TraceModal from './TraceModal'
 import { formatClinicalValue } from './textFormat'
+import ClinicalText from './ClinicalText'
 
 const TAB = 'treatment-plan'
 
@@ -85,7 +86,7 @@ function TreatmentTextCard({ title, content, evidence }: { title: string; conten
   if (!text) return null
   return (
     <FigmaReportCard title={title} icon="treatment" evidence={evidence} tab={TAB}>
-      <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+      <ClinicalText text={text} />
     </FigmaReportCard>
   )
 }

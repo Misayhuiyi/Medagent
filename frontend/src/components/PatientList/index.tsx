@@ -3,7 +3,7 @@ import { message } from 'antd'
 import { usePatientStore } from '../../store'
 import { fetchPatients, fetchPatientFiles } from '../../services/api'
 import AddPatientButton from './AddPatientButton'
-import type { PatientFile } from '../../types'
+import type { PatientEncounter, PatientFile } from '../../types'
 
 interface FileTreeReport {
   name: string
@@ -13,6 +13,7 @@ interface FileTreeReport {
 interface FileTreeEncounter {
   name: string
   reports: FileTreeReport[]
+  encounter?: PatientEncounter
 }
 
 const REPORT_ORDER = ['影像报告', '检验报告', '病历', '病理报告']
@@ -36,6 +37,13 @@ function normalizeEncounterName(name: string, fallbackDate?: string, dischargeDa
   if (fallbackDate) parts.push(`入院 ${formatDate(fallbackDate)}`)
   if (dischargeDate && dischargeDate !== fallbackDate) parts.push(`出院 ${formatDate(dischargeDate)}`)
   return parts.length > 0 ? parts.join('  ') : '就诊记录'
+}
+
+function encounterDisplayName(enc: { admission: string; discharge: string; type?: string; label?: string }) {
+  if (enc.label) return enc.label
+  if (enc.type === 'outpatient') return `门诊时间 ${formatDate(enc.admission)}`
+  if (enc.type === 'discharge') return `出院时间 ${formatDate(enc.admission)}`
+  return `入院时间 ${formatDate(enc.admission)}`
 }
 
 function normalizeReportName(value: string) {
@@ -163,6 +171,7 @@ export default function PatientList() {
   const selectPatient = usePatientStore((s) => s.selectPatient)
   const removePatient = usePatientStore((s) => s.removePatient)
   const setFiles = usePatientStore((s) => s.setFiles)
+  const setSelectedEncounter = usePatientStore((s) => s.setSelectedEncounter)
   const [keyword, setKeyword] = useState('')
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set())
   const [expandedEncounters, setExpandedEncounters] = useState<Set<string>>(new Set())
@@ -194,8 +203,9 @@ export default function PatientList() {
   const encounterList = useMemo(() => {
     if (selectedPatient?.encounters && selectedPatient.encounters.length > 0) {
       return selectedPatient.encounters.map((enc) => ({
-        name: `入院时间 ${formatDate(enc.admission)}`,
+        name: encounterDisplayName(enc),
         reports: tree[0]?.reports || [],
+        encounter: enc,
       }))
     }
     return tree
@@ -223,6 +233,17 @@ export default function PatientList() {
       return next
     })
   }, [])
+
+  const handleEncounterClick = useCallback((key: string, encounter?: PatientEncounter) => {
+    setSelectedEncounter(encounter ? {
+      admission: encounter.admission,
+      discharge: encounter.discharge,
+      type: encounter.type,
+      label: encounter.label,
+      source_admission: encounter.source_admission,
+    } : null)
+    toggleSet(setExpandedEncounters, key)
+  }, [setSelectedEncounter, toggleSet])
 
   return (
     <aside className="left-panel">
@@ -297,7 +318,7 @@ export default function PatientList() {
                       <button
                         className={`tree-node encounter-node ${encounterActive ? 'is-active' : ''}`}
                         type="button"
-                        onClick={() => toggleSet(setExpandedEncounters, encounterKey)}
+                        onClick={() => handleEncounterClick(encounterKey, encounter.encounter)}
                       >
                         <ChevronIcon expanded={encounterExpanded} />
                         <CalendarIcon />

@@ -1,0 +1,1177 @@
+{
+  "projectName": "MedAgent",
+  "projectDescription": "AI-powered lung cancer chronic disease management outpatient system",
+  "languages": [
+    "Python",
+    "TypeScript",
+    "JavaScript",
+    "CSS",
+    "YAML",
+    "Markdown"
+  ],
+  "frameworks": [
+    "FastAPI",
+    "React",
+    "LangGraph",
+    "Ant Design",
+    "Zustand",
+    "ECharts",
+    "ChromaDB"
+  ],
+  "totalFiles": 191,
+  "files": [
+    {
+      "path": "CLAUDE.md",
+      "sizeLines": 266,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "conversion_report.json",
+      "sizeLines": 1701,
+      "language": "JSON",
+      "fileCategory": "config"
+    },
+    {
+      "path": "git_push.sh",
+      "sizeLines": 13,
+      "language": "Shell",
+      "fileCategory": "script"
+    },
+    {
+      "path": "project_memory.md",
+      "sizeLines": 234,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "pyproject.toml",
+      "sizeLines": 36,
+      "language": "TOML",
+      "fileCategory": "config"
+    },
+    {
+      "path": "README.md",
+      "sizeLines": 308,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "任务需求与执行规划.md",
+      "sizeLines": 561,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "安装说明.md",
+      "sizeLines": 162,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "应用说明.md",
+      "sizeLines": 91,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "当只看脸的 RAG 学会了顺藤摸瓜…….md",
+      "sizeLines": 343,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "新旧项目对比.md",
+      "sizeLines": 377,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "迭代记录.md",
+      "sizeLines": 2669,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "阶段二详细方案.md",
+      "sizeLines": 505,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Code/main.py",
+      "sizeLines": 381,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/agent_manager.py",
+      "sizeLines": 845,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/builtin_tools.py",
+      "sizeLines": 362,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/config_manager.py",
+      "sizeLines": 155,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/context_manager.py",
+      "sizeLines": 76,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/deep_agent.py",
+      "sizeLines": 254,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/execute_tool.py",
+      "sizeLines": 133,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/execution_logger.py",
+      "sizeLines": 207,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/knowledge_base.py",
+      "sizeLines": 285,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/llm_callback.py",
+      "sizeLines": 210,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/log_setup.py",
+      "sizeLines": 85,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/mcp_connector.py",
+      "sizeLines": 197,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/memory_store.py",
+      "sizeLines": 135,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/pdf_ocr.py",
+      "sizeLines": 272,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/report_context.py",
+      "sizeLines": 701,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/report_generator.py",
+      "sizeLines": 735,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/skill_executor.py",
+      "sizeLines": 1388,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/skill_parser.py",
+      "sizeLines": 158,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/text_cleaner.py",
+      "sizeLines": 167,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/todo_manager.py",
+      "sizeLines": 75,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/tool_registry.py",
+      "sizeLines": 143,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/web_server.py",
+      "sizeLines": 268,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/_shared.py",
+      "sizeLines": 97,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/reporting/normalizer.py",
+      "sizeLines": 797,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/reporting/pdf_renderer_v4.py",
+      "sizeLines": 187,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/reporting/template_v4.py",
+      "sizeLines": 656,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/reporting/__init__.py",
+      "sizeLines": 2,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/scripts/batch_pdf_to_md.py",
+      "sizeLines": 161,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/web_routes/chat.py",
+      "sizeLines": 496,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/web_routes/debug.py",
+      "sizeLines": 166,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/web_routes/kb.py",
+      "sizeLines": 98,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/web_routes/patients.py",
+      "sizeLines": 176,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Code/DataCode/web_routes/reports.py",
+      "sizeLines": 163,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Data/platform.yaml",
+      "sizeLines": 83,
+      "language": "YAML",
+      "fileCategory": "config"
+    },
+    {
+      "path": "Data/knowledge_base/agent.py",
+      "sizeLines": 191,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Data/knowledge_base/build_page_map.py",
+      "sizeLines": 197,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Data/knowledge_base/kb_manager.py",
+      "sizeLines": 2303,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Data/knowledge_base/tool.py",
+      "sizeLines": 789,
+      "language": "Python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "Data/skills/pipeline.yaml",
+      "sizeLines": 55,
+      "language": "YAML",
+      "fileCategory": "config"
+    },
+    {
+      "path": "Data/skills/01-data-organization/SKILL.md",
+      "sizeLines": 131,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/01-data-organization/assets/test-case-zhangsan.md",
+      "sizeLines": 277,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/01-data-organization/errors/date-parse-error.md",
+      "sizeLines": 22,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/01-data-organization/experience/experience.md",
+      "sizeLines": 9,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/01-data-organization/skills/data-type-categorization/SKILL.md",
+      "sizeLines": 29,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/01-data-organization/skills/visit-time-categorization/SKILL.md",
+      "sizeLines": 79,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/SKILL.md",
+      "sizeLines": 126,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/assets/test-case-zhangsan.md",
+      "sizeLines": 63,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/errors/image-only-pdf.md",
+      "sizeLines": 27,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/errors/name-mismatch.md",
+      "sizeLines": 22,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/experience/experience.md",
+      "sizeLines": 19,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/skills/folder-management/SKILL.md",
+      "sizeLines": 136,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/skills/patient-check/SKILL.md",
+      "sizeLines": 110,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/02-data-preprocessing/skills/pdf-conversion/SKILL.md",
+      "sizeLines": 216,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/03-loop-count-determination/SKILL.md",
+      "sizeLines": 151,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/03-loop-count-determination/assets/test-case-zhangsan.md",
+      "sizeLines": 53,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/03-loop-count-determination/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/03-loop-count-determination/skills/io-mapping/SKILL.md",
+      "sizeLines": 154,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/03-loop-count-determination/skills/visit-time-analysis/SKILL.md",
+      "sizeLines": 121,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/04-scenario-judgment/SKILL.md",
+      "sizeLines": 157,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/04-scenario-judgment/assets/test-case-zhangsan.md",
+      "sizeLines": 55,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/04-scenario-judgment/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/04-scenario-judgment/skills/scenario-matching/SKILL.md",
+      "sizeLines": 144,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/SKILL.md",
+      "sizeLines": 175,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/assets/test-case-zhangsan.md",
+      "sizeLines": 37,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/skills/allergy-history/SKILL.md",
+      "sizeLines": 106,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/skills/family-history/SKILL.md",
+      "sizeLines": 126,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/skills/past-history/SKILL.md",
+      "sizeLines": 110,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/skills/personal-history/SKILL.md",
+      "sizeLines": 134,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/05-patient-history-summary/skills/present-illness/SKILL.md",
+      "sizeLines": 145,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/SKILL.md",
+      "sizeLines": 138,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/assets/test-case-zhangsan.md",
+      "sizeLines": 33,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/adverse-event-assessment/SKILL.md",
+      "sizeLines": 22,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/auxiliary-examination/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/comorbidity-assessment/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/diagnosis-summary/SKILL.md",
+      "sizeLines": 18,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/ecog-score/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/physical-examination/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/tumor-burden-assessment/SKILL.md",
+      "sizeLines": 23,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/06-patient-profile/skills/tumor-efficacy-assessment/SKILL.md",
+      "sizeLines": 22,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/SKILL.md",
+      "sizeLines": 136,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/assets/test-case-zhangsan.md",
+      "sizeLines": 24,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/skills/clinical-trial-screening/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/skills/expert-consensus-supplement/SKILL.md",
+      "sizeLines": 30,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/skills/guideline-matching/SKILL.md",
+      "sizeLines": 30,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/skills/plan-evaluation/SKILL.md",
+      "sizeLines": 27,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/07-treatment-plan/skills/plan-modification-judgment/SKILL.md",
+      "sizeLines": 20,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/08-efficacy-prediction/SKILL.md",
+      "sizeLines": 57,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/08-efficacy-prediction/assets/test-case-zhangsan.md",
+      "sizeLines": 22,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/08-efficacy-prediction/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/08-efficacy-prediction/skills/adverse-event-prediction/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/08-efficacy-prediction/skills/efficacy-prediction-scoring/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/08-efficacy-prediction/skills/prognosis-prediction/SKILL.md",
+      "sizeLines": 18,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/09-other-suggestions/SKILL.md",
+      "sizeLines": 91,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/09-other-suggestions/assets/test-case-zhangsan.md",
+      "sizeLines": 19,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/09-other-suggestions/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/09-other-suggestions/skills/health-education/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/09-other-suggestions/skills/nursing-measures/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/09-other-suggestions/skills/rehabilitation-suggestions/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/10-report-generation/SKILL.md",
+      "sizeLines": 51,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/10-report-generation/assets/test-case-zhangsan.md",
+      "sizeLines": 23,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/10-report-generation/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/10-report-generation/skills/report-format-conversion/SKILL.md",
+      "sizeLines": 128,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-01-optimization-experience/SKILL.md",
+      "sizeLines": 35,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-01-optimization-experience/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-01-optimization-experience/skills/case-analysis/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-01-optimization-experience/skills/experience-extraction/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-02-doctor-llm-finetuning/SKILL.md",
+      "sizeLines": 34,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-02-doctor-llm-finetuning/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-02-doctor-llm-finetuning/skills/data-preparation/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-02-doctor-llm-finetuning/skills/finetuning-execution/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-03-clinical-experience/SKILL.md",
+      "sizeLines": 33,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-03-clinical-experience/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-03-clinical-experience/skills/consultation-analysis/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-03-clinical-experience/skills/experience-refinement/SKILL.md",
+      "sizeLines": 16,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-04-doctor-team-llm-finetuning/SKILL.md",
+      "sizeLines": 35,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-04-doctor-team-llm-finetuning/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-04-doctor-team-llm-finetuning/skills/experience-fusion/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-04-doctor-team-llm-finetuning/skills/team-finetuning/SKILL.md",
+      "sizeLines": 17,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-05-model-training-automation/SKILL.md",
+      "sizeLines": 40,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-05-model-training-automation/experience/experience.md",
+      "sizeLines": 8,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-05-model-training-automation/skills/data-preprocessing/SKILL.md",
+      "sizeLines": 18,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/rl-05-model-training-automation/skills/model-training/SKILL.md",
+      "sizeLines": 19,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Data/skills/_shared/knowledge-retrieval/SKILL.md",
+      "sizeLines": 128,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "Docker/docker-compose.yaml",
+      "sizeLines": 17,
+      "language": "YAML",
+      "fileCategory": "config"
+    },
+    {
+      "path": "Docker/Dockerfile",
+      "sizeLines": 23,
+      "language": "Dockerfile",
+      "fileCategory": "infra"
+    },
+    {
+      "path": "Docker/start.sh",
+      "sizeLines": 23,
+      "language": "Shell",
+      "fileCategory": "script"
+    },
+    {
+      "path": "frontend/eslint.config.js",
+      "sizeLines": 22,
+      "language": "JavaScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/index.html",
+      "sizeLines": 16,
+      "language": "HTML",
+      "fileCategory": "markup"
+    },
+    {
+      "path": "frontend/package-lock.json",
+      "sizeLines": 7044,
+      "language": "JSON",
+      "fileCategory": "config"
+    },
+    {
+      "path": "frontend/package.json",
+      "sizeLines": 46,
+      "language": "JSON",
+      "fileCategory": "config"
+    },
+    {
+      "path": "frontend/README.md",
+      "sizeLines": 73,
+      "language": "Markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "frontend/tsconfig.app.json",
+      "sizeLines": 25,
+      "language": "JSON",
+      "fileCategory": "config"
+    },
+    {
+      "path": "frontend/tsconfig.json",
+      "sizeLines": 7,
+      "language": "JSON",
+      "fileCategory": "config"
+    },
+    {
+      "path": "frontend/tsconfig.node.json",
+      "sizeLines": 24,
+      "language": "JSON",
+      "fileCategory": "config"
+    },
+    {
+      "path": "frontend/vite.config.ts",
+      "sizeLines": 24,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/dist/index.html",
+      "sizeLines": 17,
+      "language": "HTML",
+      "fileCategory": "markup"
+    },
+    {
+      "path": "frontend/dist/assets/index-3VWXxtaj.css",
+      "sizeLines": 1884,
+      "language": "CSS",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/dist/assets/index-BzPFPass.js",
+      "sizeLines": 569,
+      "language": "JavaScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/aidoc.css",
+      "sizeLines": 1883,
+      "language": "CSS",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/App.tsx",
+      "sizeLines": 22,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/main.tsx",
+      "sizeLines": 9,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ChatPanel/ChatInput.tsx",
+      "sizeLines": 81,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ChatPanel/index.tsx",
+      "sizeLines": 225,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ChatPanel/MessageBubble.tsx",
+      "sizeLines": 79,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ChatPanel/MessageList.tsx",
+      "sizeLines": 45,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/common/ErrorBoundary.tsx",
+      "sizeLines": 37,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/common/MarkdownRenderer.tsx",
+      "sizeLines": 137,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/PatientList/AddPatientButton.tsx",
+      "sizeLines": 22,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/PatientList/index.tsx",
+      "sizeLines": 377,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/chartData.ts",
+      "sizeLines": 148,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/ClinicalText.tsx",
+      "sizeLines": 77,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/DownloadButton.tsx",
+      "sizeLines": 89,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/EditForm.tsx",
+      "sizeLines": 69,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/FigmaReportCard.tsx",
+      "sizeLines": 102,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/index.tsx",
+      "sizeLines": 389,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/PipelineTiming.tsx",
+      "sizeLines": 95,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/TabCare.tsx",
+      "sizeLines": 32,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/TabHistory.tsx",
+      "sizeLines": 135,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/TabOverview.tsx",
+      "sizeLines": 162,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/TabPrediction.tsx",
+      "sizeLines": 162,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/TabTreatment.tsx",
+      "sizeLines": 127,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/textFormat.ts",
+      "sizeLines": 50,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/ReportPanel/TraceModal.tsx",
+      "sizeLines": 85,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/components/TopBar/index.tsx",
+      "sizeLines": 12,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/hooks/useChat.ts",
+      "sizeLines": 194,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/services/api.ts",
+      "sizeLines": 85,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/services/__tests__/api.test.ts",
+      "sizeLines": 76,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/store/chatStore.ts",
+      "sizeLines": 63,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/store/editStore.ts",
+      "sizeLines": 29,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/store/index.ts",
+      "sizeLines": 4,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/store/patientStore.ts",
+      "sizeLines": 49,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/store/reportStore.ts",
+      "sizeLines": 33,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/store/__tests__/stores.test.ts",
+      "sizeLines": 175,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/test/setup.ts",
+      "sizeLines": 1,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "frontend/src/types/index.ts",
+      "sizeLines": 360,
+      "language": "TypeScript",
+      "fileCategory": "code"
+    }
+  ],
+  "complexity": "high",
+  "filteredByIgnore": 1463,
+  "entryPoints": [
+    "Code/main.py",
+    "frontend/src/main.tsx"
+  ],
+  "importMap": {}
+}

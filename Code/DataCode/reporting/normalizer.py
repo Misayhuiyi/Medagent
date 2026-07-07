@@ -133,6 +133,8 @@ SECTION_PATTERNS: dict[str, list[str]] = {
 
 OUTPUT_NOISE_MARKERS = [
     "合并输出JSON",
+    "输出JSON",
+    "完整输出JSON",
     "```json",
     "【当前步骤上下文",
     "各子Skill输出文件",
@@ -140,11 +142,33 @@ OUTPUT_NOISE_MARKERS = [
     "请按上述步骤执行",
     "所有阶段已完成",
     "所有子Skill已执行完毕",
+    "所有5个子Skill",
+    "所有三个子Skill",
+    "均已并行执行完成",
+    "并行执行完成",
     "三个子Skill已全部成功执行",
     "现在让我整合",
+    "现在整合全部结果",
+    "现在进行**第",
     "让我直接整理输出",
     "现在进行**步骤",
     "第1阶段和第2阶段全部完成",
+]
+TRUNCATE_NOISE_MARKERS = [
+    "合并输出JSON",
+    "输出JSON",
+    "完整输出JSON",
+    "```json",
+    "参考文献汇总",
+    "【当前步骤上下文",
+    "各子Skill输出文件",
+]
+PROCESS_LINE_PATTERNS = [
+    re.compile(r"^.*所有.{0,8}子Skill.*(?:完成|执行).*$"),
+    re.compile(r"^.*并行执行完成.*$"),
+    re.compile(r"^.*现在(?:进行|整合|让我|开始).{0,80}$"),
+    re.compile(r"^.*第\s*\d+\s*步[:：]?.*$"),
+    re.compile(r"^.*输出完整的?.{0,30}报告.*$"),
 ]
 
 STATUS_SYMBOLS = "✅❓⚠️⚡✳️📋🎯🔴🟠🟡🟢🔵🅰🅱🅲🅳🅴❌"
@@ -160,7 +184,14 @@ def normalize_patient_info(patient_info: dict | None) -> PatientInfo:
         name=str(data.get("name") or ""),
         sex=str(data.get("sex") or data.get("gender") or ""),
         age=str(data.get("age") or ""),
-        patient_id=str(data.get("id") or data.get("patient_id") or ""),
+        patient_id=str(
+            data.get("patient_id")
+            or data.get("outpatient_no")
+            or data.get("visit_number")
+            or data.get("medical_record_no")
+            or data.get("id")
+            or ""
+        ),
         phone=str(data.get("phone") or ""),
     )
 
@@ -180,7 +211,9 @@ def normalize_report(report: dict, title: str, patient_info: dict | None = None)
         tab_key: _clean_section_content(content, tab_key)
         for tab_key, content in raw_tabs.items()
     }
-    model.chart_source = "\n\n".join(raw_tabs.values())
+    model.chart_source = "\n\n".join(
+        part for part in [*raw_tabs.values(), _structured_chart_source(report)] if part
+    )
 
     matches_found: dict[str, set[str]] = {}
 
@@ -263,6 +296,99 @@ def _get_raw_content(tab_data: Any) -> str:
     return str(tab_data or "")
 
 
+def _structured_chart_source(report: dict) -> str:
+    """Synthesize searchable measurement lines from structured chart fields.
+
+    The V4 template's SVG chart parser works from text so that old Markdown
+    reports still export. This helper feeds it structured chart values too,
+    keeping PDF export consistent with the React ECharts preview.
+    """
+    lines: list[str] = []
+
+    def add_point(label: Any, value: Any) -> None:
+        number = _clinical_number(value)
+        label_text = str(label or "").strip() or f"T{len(lines) + 1}"
+        if number is not None:
+            lines.append(f"{label_text} 肿瘤长径 {number:g}mm x {number:g}mm")
+
+    def add_point_chart(raw: Any) -> None:
+        if not isinstance(raw, dict):
+            return
+        labels = _first_list(raw.get("labels"), raw.get("dates"), raw.get("xAxis"))
+        values = _first_list(raw.get("values"), raw.get("sizes"), raw.get("yAxis"))
+        if labels and values:
+            for index, label in enumerate(labels):
+                add_point(label, values[index] if index < len(values) else None)
+        points = raw.get("points") if isinstance(raw.get("points"), list) else raw.get("data")
+        if isinstance(points, list):
+            for item in points:
+                if isinstance(item, dict):
+                    add_point(
+                        item.get("date") or item.get("time") or item.get("label") or item.get("x"),
+                        item.get("value") or item.get("size") or item.get("diameter") or item.get("long_diameter") or item.get("y"),
+                    )
+
+    def add_multi_series(raw: Any) -> None:
+        if not isinstance(raw, dict):
+            return
+        labels = _first_list(raw.get("labels"), raw.get("dates"), raw.get("xAxis"))
+        if not labels:
+            return
+        series = raw.get("series")
+        if isinstance(series, list):
+            for item in series:
+                if not isinstance(item, dict):
+                    continue
+                values = _first_list(item.get("values"), item.get("data"))
+                if values:
+                    for index, label in enumerate(labels):
+                        add_point(label, values[index] if index < len(values) else None)
+                    return
+        values = _first_list(raw.get("values"), raw.get("sizes"), raw.get("yAxis"))
+        if values:
+            for index, label in enumerate(labels):
+                add_point(label, values[index] if index < len(values) else None)
+
+    history = report.get("patient-history") if isinstance(report, dict) else {}
+    if isinstance(history, dict):
+        present = history.get("present_illness")
+        if isinstance(present, dict):
+            for key in ("tumor_size_chart", "tumorSizeChart", "tumorSize", "tumor_size"):
+                add_point_chart(present.get(key))
+        for key in ("tumor_size_chart", "tumorSizeChart", "tumorSize", "tumor_size"):
+            add_point_chart(history.get(key))
+
+    prediction = report.get("efficacy-prediction") if isinstance(report, dict) else {}
+    if isinstance(prediction, dict):
+        add_multi_series(prediction.get("tumor_prediction"))
+
+    return "\n".join(lines)
+
+
+def _first_list(*values: Any) -> list[Any]:
+    for value in values:
+        if isinstance(value, list) and value:
+            return value
+    return []
+
+
+def _clinical_number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text or re.fullmatch(r"[-—无未测缺失naNA/]+", text):
+        return None
+    numbers = [float(match.group(0)) for match in re.finditer(r"-?\d+(?:\.\d+)?", text)]
+    if not numbers:
+        return None
+    number = max(abs(item) for item in numbers)
+    if re.search(r"cm|厘米", text, re.I) and not re.search(r"mm|毫米", text, re.I):
+        number *= 10
+    return number
+
+
 def _is_markdown_only_tab(tab_data: dict) -> bool:
     content = tab_data.get("_content") or tab_data.get("content") or tab_data.get("result")
     structured_keys = [
@@ -282,7 +408,7 @@ def _extract_field(tab_data: dict, field: str) -> str:
         value = _lookup_value(tab_data, cn_key) if cn_key else None
     if value is None:
         return ""
-    return _value_to_text(value)
+    return _value_to_text(value, field)
 
 
 def _lookup_value(data: Any, key: str) -> Any:
@@ -305,7 +431,7 @@ def _get_content_from_tab(tab_data: dict, tab_key: str = "") -> str:
     return _dict_to_text(tab_data)
 
 
-def _value_to_text(value: Any) -> str:
+def _value_to_text(value: Any, context: str = "") -> str:
     if value is None:
         return ""
     if isinstance(value, str):
@@ -316,13 +442,16 @@ def _value_to_text(value: Any) -> str:
         parts = []
         for item in value:
             if isinstance(item, dict):
-                parts.append(" | ".join(f"{k}: {_value_to_text(v)}" for k, v in item.items() if v is not None))
+                parts.append("；".join(f"{_display_key(k)}：{_value_to_text(v, str(k))}" for k, v in item.items() if v is not None))
             else:
-                parts.append(_value_to_text(item))
+                parts.append(_value_to_text(item, context))
         return "\n".join(f"- {part}" for part in parts if part)
     if isinstance(value, dict):
         if isinstance(value.get("summary"), str):
             return value["summary"].strip()
+        natural = _naturalize_structured_dict(value, context)
+        if natural:
+            return natural
         return _dict_to_text(value)
     return str(value)
 
@@ -336,16 +465,16 @@ def _dict_to_text(data: dict, indent: int = 0) -> str:
         if value is None or value == "":
             continue
         if isinstance(value, dict):
-            lines.append(f"{prefix}**{key}**：")
+            lines.append(f"{prefix}**{_display_key(str(key))}**：")
             nested = _dict_to_text(value, indent + 1)
             if nested:
                 lines.append(nested)
         elif isinstance(value, list):
             text = _value_to_text(value)
             if text:
-                lines.append(f"{prefix}**{key}**：\n{text}")
+                lines.append(f"{prefix}**{_display_key(str(key))}**：\n{text}")
         else:
-            lines.append(f"{prefix}**{key}**：{_value_to_text(value)}")
+            lines.append(f"{prefix}**{_display_key(str(key))}**：{_value_to_text(value, str(key))}")
     return "\n".join(lines)
 
 
@@ -354,9 +483,15 @@ def _clean_section_content(content: str, tab_key: str) -> str:
     if not content:
         return ""
     content = content.replace("\r\n", "\n").replace("\r", "\n")
-    for marker in OUTPUT_NOISE_MARKERS:
+    content = "\n".join(
+        line for line in content.splitlines()
+        if not any(pattern.match(line.strip()) for pattern in PROCESS_LINE_PATTERNS)
+    )
+    content = re.sub(r"(?im)^\s*[-*]*\s*(?:所有.{0,8}子Skill|并行执行完成|现在整合全部结果).*$", "", content)
+    content = re.sub(r"(?im)^\s*#{0,6}\s*(?:[一二三四五六七八九十]+[、.．]\s*)?输出JSON\s*$[\s\S]*$", "", content)
+    for marker in TRUNCATE_NOISE_MARKERS:
         pos = content.find(marker)
-        if pos > 0:
+        if pos >= 0:
             content = content[:pos].rstrip()
     content = re.sub(r"(?s)```json.*?```", "", content)
     content = re.sub(r"(?im)^好的[，,].{0,80}$", "", content)
@@ -375,6 +510,124 @@ def _clean_section_content(content: str, tab_key: str) -> str:
         if pos > 0:
             return content[:pos].rstrip()
     return content
+
+
+_KEY_LABELS: dict[str, str] = {
+    "summary": "摘要",
+    "status": "状态",
+    "source": "来源",
+    "note": "备注",
+    "notes": "备注",
+    "detail": "详情",
+    "details": "详情",
+    "smoking": "吸烟史",
+    "alcohol": "饮酒史",
+    "drinking": "饮酒史",
+    "occupationalExposure": "职业暴露史",
+    "occupational_exposure": "职业暴露史",
+    "environmentalFactors": "环境暴露史",
+    "environmental_factors": "环境暴露史",
+    "maritalStatus": "婚育史",
+    "marital_status": "婚育史",
+    "vaccination": "预防接种史",
+    "yearsSmoked": "吸烟年限",
+    "years_smoked": "吸烟年限",
+    "cigarettesPerDay": "每日吸烟量",
+    "cigarettes_per_day": "每日吸烟量",
+    "packYears": "吸烟指数",
+    "pack_years": "吸烟指数",
+    "quitDuration": "戒烟时长",
+    "quit_duration": "戒烟时长",
+    "disease": "疾病",
+    "system": "系统",
+    "surgery": "手术",
+    "time": "时间",
+    "drug": "药物",
+    "reaction": "反应",
+    "regimen": "方案",
+    "drugs": "用药",
+    "best_response": "最佳疗效",
+    "main_ae": "主要不良反应",
+}
+
+
+def _display_key(key: str) -> str:
+    return _KEY_LABELS.get(key, key.replace("_", " "))
+
+
+def _naturalize_structured_dict(data: dict, context: str = "") -> str:
+    ctx = context.lower()
+    if context == "personal_history" or {"smoking", "alcohol", "occupationalExposure", "environmentalFactors"} & set(data):
+        parts: list[str] = []
+        smoking = data.get("smoking")
+        if isinstance(smoking, dict):
+            desc = _smoking_text(smoking)
+            if desc:
+                parts.append(f"吸烟史：{desc}")
+        alcohol = data.get("alcohol") or data.get("drinking")
+        if isinstance(alcohol, dict):
+            desc = _alcohol_text(alcohol)
+            if desc:
+                parts.append(f"饮酒史：{desc}")
+        occupational = data.get("occupationalExposure") or data.get("occupational_exposure")
+        if isinstance(occupational, dict):
+            parts.append(f"职业暴露史：{_simple_status_note(occupational)}")
+        environmental = data.get("environmentalFactors") or data.get("environmental_factors")
+        if isinstance(environmental, dict):
+            parts.append(f"环境暴露史：{_simple_status_note(environmental)}")
+        other = data.get("other")
+        if isinstance(other, dict):
+            for key in ("maritalStatus", "marital_status", "vaccination"):
+                if other.get(key):
+                    parts.append(f"{_display_key(key)}：{_value_to_text(other.get(key), key)}")
+        if parts:
+            return "；".join(parts) + "。"
+
+    if "allergy" in ctx and {"noKnownAllergy", "notMentioned"} & set(data):
+        if data.get("noKnownAllergy"):
+            return "否认明确食物或药物过敏史。"
+        if data.get("notMentioned"):
+            return "资料未提及明确过敏史，建议补充核实。"
+
+    return ""
+
+
+def _smoking_text(data: dict) -> str:
+    status = _value_to_text(data.get("status"), "status")
+    years = data.get("yearsSmoked") or data.get("years_smoked")
+    amount = data.get("cigarettesPerDay") or data.get("cigarettes_per_day")
+    pack_years = data.get("packYears") or data.get("pack_years")
+    quit_duration = data.get("quitDuration") or data.get("quit_duration")
+    pieces = []
+    if status:
+        pieces.append(status)
+    if years:
+        pieces.append(f"吸烟{years}年")
+    if amount:
+        pieces.append(f"约{amount}支/日")
+    if pack_years:
+        pieces.append(f"吸烟指数约{pack_years}包年")
+    if quit_duration:
+        pieces.append(f"戒烟约{quit_duration}")
+    return "，".join(pieces)
+
+
+def _alcohol_text(data: dict) -> str:
+    if data.get("detail"):
+        return _value_to_text(data.get("detail"), "detail")
+    status = _value_to_text(data.get("status"), "status")
+    amount = _value_to_text(data.get("amount") or data.get("quantity"), "amount")
+    duration = _value_to_text(data.get("duration") or data.get("years"), "duration")
+    pieces = [part for part in (status, duration, amount) if part]
+    return "，".join(pieces)
+
+
+def _simple_status_note(data: dict) -> str:
+    status = _value_to_text(data.get("status"), "status")
+    note = _value_to_text(data.get("note"), "note")
+    if status and note:
+        return f"{status}（{note}）"
+    return status or note or _dict_to_text(data)
 
 
 def _extract_markdown_section(content: str, section_title: str) -> str:
@@ -682,6 +935,9 @@ def _clean_display_line(line: str) -> str:
     line = line.replace("**", "")
     line = line.replace("__", "")
     line = line.replace("`", "")
+    line = re.sub(r"([：:；;，,（(]\s*)数据[：:]", r"\1", line)
+    line = re.sub(r"^数据[：:]\s*", "", line)
+    line = re.sub(r"([：:])\s*状态[：:]\s*", r"\1", line)
     if "|" in line:
         parts = [_clean_table_cell(part) for part in line.split("|")]
         parts = [part for part in parts if part and not set(part) <= {"-", ":"}]

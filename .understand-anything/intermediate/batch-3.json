@@ -1,0 +1,1329 @@
+{
+  "nodes": [
+    {
+      "id": "file-main-py",
+      "label": "Code/main.py",
+      "type": "file",
+      "subtype": "entry_point",
+      "description": "MedAgent 唯一主入口文件，支持 web/cli/blank 三种运行模式。符合佰茵云规范：Code/ 下仅此一个主函数文件。",
+      "file_path": "Code/main.py",
+      "line_count": 381,
+      "language": "Python",
+      "key_functions": [
+        "main",
+        "_run_web",
+        "_run_cli",
+        "_run_blank",
+        "_init_web_app",
+        "_load_env",
+        "_load_params",
+        "_build_llm_candidates"
+      ]
+    },
+    {
+      "id": "file-tool-py",
+      "label": "Data/knowledge_base/tool.py",
+      "type": "file",
+      "subtype": "business_layer",
+      "description": "医学知识库 Tool 层，对 kb_manager 检索引擎的业务封装。提供搜索、格式化、去重、多机构均衡、Agent 工具注册等功能。",
+      "file_path": "Data/knowledge_base/tool.py",
+      "line_count": 789,
+      "language": "Python",
+      "key_functions": [
+        "search_guidelines",
+        "search_medical_guidelines",
+        "get_source_context",
+        "get_source_detail",
+        "parse_query_intent",
+        "bilingual_expand",
+        "run_agent_tool",
+        "get_openai_tools",
+        "get_langchain_tools"
+      ],
+      "key_classes": [
+        "SearchGuidelinesInput",
+        "GetSourceDetailInput"
+      ]
+    },
+    {
+      "id": "file-kb-manager-py",
+      "label": "Data/knowledge_base/kb_manager.py",
+      "type": "file",
+      "subtype": "engine_layer",
+      "description": "ChromaDB 知识库管理器，核心引擎。含索引构建/增量更新/续跑、ChromaDB 操作、分块算法、Embedding (Ollama bge-m3)、CrossEncoder 重排序 (bge-reranker-v2-m3)、证据等级体系、元数据提取、查询检索。",
+      "file_path": "Data/knowledge_base/kb_manager.py",
+      "line_count": 2303,
+      "language": "Python",
+      "key_functions": [
+        "build_index",
+        "update_index",
+        "resume_missing_index",
+        "query_knowledge",
+        "get_chroma_collection",
+        "ollama_embed",
+        "cross_encoder_rerank",
+        "chunk_markdown",
+        "extract_metadata",
+        "extract_chunk_metadata",
+        "show_status",
+        "get_source_document",
+        "find_chunk_in_document",
+        "retry_failed_chunks"
+      ],
+      "key_classes": []
+    },
+    {
+      "id": "file-agent-py",
+      "label": "Data/knowledge_base/agent.py",
+      "type": "file",
+      "subtype": "agent_layer",
+      "description": "医学知识库 Agent 封装，通过 Function Calling 调用 Tool 层 + DeepSeek LLM 推理，实现循证医学问答。",
+      "file_path": "Data/knowledge_base/agent.py",
+      "line_count": 191,
+      "language": "Python",
+      "key_functions": [
+        "chat",
+        "call_llm",
+        "run_tool",
+        "interactive",
+        "main"
+      ]
+    },
+    {
+      "id": "file-build-page-map-py",
+      "label": "Data/knowledge_base/build_page_map.py",
+      "type": "file",
+      "subtype": "build_tool",
+      "description": "Chunk 到 PDF 页码映射构建脚本。读取 ChromaDB 中的 chunk，与 MinerU JSON 做匹配，产出 page_mapping.json。",
+      "file_path": "Data/knowledge_base/build_page_map.py",
+      "line_count": 197,
+      "language": "Python",
+      "key_functions": [
+        "main",
+        "find_page_from_json",
+        "load_json_page_map",
+        "count_pdf_pages"
+      ]
+    },
+    {
+      "id": "func-main",
+      "label": "main()",
+      "type": "function",
+      "subtype": "entry_dispatcher",
+      "description": "主入口函数。加载 .env 后根据 sys.argv[1] 分发到 web/cli/blank 三种模式。",
+      "parent": "file-main-py",
+      "line": 360
+    },
+    {
+      "id": "func-run-web",
+      "label": "_run_web()",
+      "type": "function",
+      "subtype": "web_mode",
+      "description": "启动 FastAPI Web 服务（端口 8000）。调用 _init_web_app() 初始化全部组件后启动 uvicorn。",
+      "parent": "file-main-py",
+      "line": 160
+    },
+    {
+      "id": "func-run-cli",
+      "label": "_run_cli()",
+      "type": "function",
+      "subtype": "cli_mode",
+      "description": "CLI 流水线模式。读取 TempData/params.txt 参数，按 pipeline.yaml 串行执行每个 Skill。",
+      "parent": "file-main-py",
+      "line": 173
+    },
+    {
+      "id": "func-run-blank",
+      "label": "_run_blank()",
+      "type": "function",
+      "subtype": "validation_mode",
+      "description": "空白验证模式：检查目录结构、配置文件、模块加载、SkillParser 是否正常。验证框架可启动。",
+      "parent": "file-main-py",
+      "line": 286
+    },
+    {
+      "id": "func-init-web-app",
+      "label": "_init_web_app()",
+      "type": "function",
+      "subtype": "web_initializer",
+      "description": "初始化 Web 应用全部组件：ConfigManager, ToolRegistry, MemoryStore, AgentManager, RagKnowledgeBase, SkillExecutor。注册内置工具。",
+      "parent": "file-main-py",
+      "line": 86
+    },
+    {
+      "id": "func-load-params",
+      "label": "_load_params()",
+      "type": "function",
+      "subtype": "param_loader",
+      "description": "从 TempData/params.txt 加载参数（两行一组键值对）。支持 # 注释行。",
+      "parent": "file-main-py",
+      "line": 48
+    },
+    {
+      "id": "func-search-guidelines",
+      "label": "search_guidelines()",
+      "type": "function",
+      "subtype": "main_search",
+      "description": "Tool 层主入口。流程：解析查询意图, 双语扩展, 构建 where 条件, 向量检索（多机构时分机构查询）, 后过滤, 多机构均衡/去重, 格式化输出。",
+      "parent": "file-tool-py",
+      "line": 388
+    },
+    {
+      "id": "func-parse-query-intent",
+      "label": "parse_query_intent()",
+      "type": "function",
+      "subtype": "query_parser",
+      "description": "从用户查询中提取检索意图：分期、治疗线、靶点、来源机构等。高置信字段用于硬过滤，其余进入软扩展。",
+      "parent": "file-tool-py",
+      "line": 96
+    },
+    {
+      "id": "func-bilingual-expand",
+      "label": "bilingual_expand()",
+      "type": "function",
+      "subtype": "query_expander",
+      "description": "中文查询到附加英文术语扩展。含低频医学实体同义词扩展（如 内脏静脉血栓）。",
+      "parent": "file-tool-py",
+      "line": 162
+    },
+    {
+      "id": "func-deduplicate-fill",
+      "label": "deduplicate_and_fill()",
+      "type": "function",
+      "subtype": "result_processor",
+      "description": "同系列文献去重（保留最新年份）后用后备结果补位，避免 Top-K 被压缩得过少。",
+      "parent": "file-tool-py",
+      "line": 232
+    },
+    {
+      "id": "func-ensure-org-diversity",
+      "label": "ensure_org_diversity()",
+      "type": "function",
+      "subtype": "result_processor",
+      "description": "多机构查询时确保每个机构至少保留 1 条结果，避免单一机构垄断 Top-K。",
+      "parent": "file-tool-py",
+      "line": 249
+    },
+    {
+      "id": "func-format-for-llm",
+      "label": "format_for_llm()",
+      "type": "function",
+      "subtype": "formatter",
+      "description": "将检索结果格式化为 LLM 可读的全文上下文。含证据等级、机构、年份、页码、推荐等级。",
+      "parent": "file-tool-py",
+      "line": 301
+    },
+    {
+      "id": "func-format-for-agent",
+      "label": "format_for_agent()",
+      "type": "function",
+      "subtype": "formatter",
+      "description": "结构化证据卡给 Agent 用，兼顾证据完整性和 token 预算。内容截断到 420 字符。",
+      "parent": "file-tool-py",
+      "line": 332
+    },
+    {
+      "id": "func-search-medical-guidelines",
+      "label": "search_medical_guidelines()",
+      "type": "function",
+      "subtype": "agent_tool",
+      "description": "Agent 标准工具函数，包装 search_guidelines()，mode=agent 返回精简摘要。",
+      "parent": "file-tool-py",
+      "line": 540
+    },
+    {
+      "id": "func-get-source-detail",
+      "label": "get_source_detail()",
+      "type": "function",
+      "subtype": "agent_tool",
+      "description": "Agent 标准工具函数：获取检索结果所在源文档的上下文。",
+      "parent": "file-tool-py",
+      "line": 564
+    },
+    {
+      "id": "func-run-agent-tool",
+      "label": "run_agent_tool()",
+      "type": "function",
+      "subtype": "tool_dispatcher",
+      "description": "按工具名统一校验参数并执行工具。含简单缓存。兼容 Pydantic v1/v2。",
+      "parent": "file-tool-py",
+      "line": 623
+    },
+    {
+      "id": "func-get-openai-tools",
+      "label": "get_openai_tools()",
+      "type": "function",
+      "subtype": "tool_registrar",
+      "description": "返回 DeepSeek/OpenAI function calling 兼容的 tools 定义列表。",
+      "parent": "file-tool-py",
+      "line": 597
+    },
+    {
+      "id": "func-get-langchain-tools",
+      "label": "get_langchain_tools()",
+      "type": "function",
+      "subtype": "tool_registrar",
+      "description": "返回 LangChain StructuredTool 列表。需要 langchain-core 库。",
+      "parent": "file-tool-py",
+      "line": 651
+    },
+    {
+      "id": "func-multi-org-query",
+      "label": "_multi_org_query()",
+      "type": "function",
+      "subtype": "search_strategy",
+      "description": "多机构分机构独立检索。逐机构调用 ChromaDB query，合并候选后 CrossEncoder 精排，融合分数。",
+      "parent": "file-tool-py",
+      "line": 692
+    },
+    {
+      "id": "func-query-knowledge",
+      "label": "query_knowledge()",
+      "type": "function",
+      "subtype": "search_engine",
+      "description": "纯检索引擎核心。流程：Embedding, 向量检索（支持带 where 过滤 + 无过滤双路召回）, 候选合并, CrossEncoder 精排, 融合排序。",
+      "parent": "file-kb-manager-py",
+      "line": 2003
+    },
+    {
+      "id": "func-build-index",
+      "label": "build_index()",
+      "type": "function",
+      "subtype": "index_builder",
+      "description": "构建/重建 ChromaDB 索引。支持 full/core_only。全量模式先清空旧索引。使用 ThreadPoolExecutor 并发 Ollama embedding。含失败 chunk 补偿重试。",
+      "parent": "file-kb-manager-py",
+      "line": 1684
+    },
+    {
+      "id": "func-resume-missing-index",
+      "label": "resume_missing_index()",
+      "type": "function",
+      "subtype": "index_builder",
+      "description": "从当前 Chroma 集合中缺失的 source_file 续跑，不清空已有索引。用于断点续跑。",
+      "parent": "file-kb-manager-py",
+      "line": 1551
+    },
+    {
+      "id": "func-retry-failed-chunks",
+      "label": "retry_failed_chunks()",
+      "type": "function",
+      "subtype": "index_builder",
+      "description": "按失败日志 failed_chunks.jsonl 补跑未嵌入的 chunk。",
+      "parent": "file-kb-manager-py",
+      "line": 1467
+    },
+    {
+      "id": "func-update-index",
+      "label": "update_index()",
+      "type": "function",
+      "subtype": "index_builder",
+      "description": "增量更新索引，调用 build_index(full=False)。",
+      "parent": "file-kb-manager-py",
+      "line": 1855
+    },
+    {
+      "id": "func-chunk-markdown",
+      "label": "chunk_markdown()",
+      "type": "function",
+      "subtype": "chunker",
+      "description": "MD 文档分块算法。按 H2/H3 标题切分，跳过非内容章节。超 500 token 时按段落再切，含段落重叠。",
+      "parent": "file-kb-manager-py",
+      "line": 873
+    },
+    {
+      "id": "func-extract-metadata",
+      "label": "extract_metadata()",
+      "type": "function",
+      "subtype": "metadata_extractor",
+      "description": "从文件路径和文件名提取元数据：来源机构、年份、疾病类型、文档类型、证据等级 (rank 1-8)、语言等。",
+      "parent": "file-kb-manager-py",
+      "line": 222
+    },
+    {
+      "id": "func-extract-chunk-metadata",
+      "label": "extract_chunk_metadata()",
+      "type": "function",
+      "subtype": "metadata_extractor",
+      "description": "从 chunk 内容正则提取结构化元数据：分期、治疗线、生物标志物、药物名、转移部位、不良反应、临床试验、推荐等级、证据类型。",
+      "parent": "file-kb-manager-py",
+      "line": 424
+    },
+    {
+      "id": "func-get-chroma-collection",
+      "label": "get_chroma_collection()",
+      "type": "function",
+      "subtype": "db_access",
+      "description": "获取/创建 ChromaDB PersistentClient 和 collection。余弦距离空间。集合名由 KB_COLLECTION_NAME 控制。",
+      "parent": "file-kb-manager-py",
+      "line": 1279
+    },
+    {
+      "id": "func-ollama-embed",
+      "label": "ollama_embed()",
+      "type": "function",
+      "subtype": "embedding",
+      "description": "调用 Ollama API 生成嵌入向量。bge-m3 模型。Semaphore 并发控制、指数退避重试、文本截断。",
+      "parent": "file-kb-manager-py",
+      "line": 1092
+    },
+    {
+      "id": "func-local-embed",
+      "label": "_local_embed()",
+      "type": "function",
+      "subtype": "embedding_fallback",
+      "description": "本地 sentence-transformers BAAI/bge-m3 回退方案。Ollama 不可用时自动降级。",
+      "parent": "file-kb-manager-py",
+      "line": 1144
+    },
+    {
+      "id": "func-get-embedding",
+      "label": "_get_embedding()",
+      "type": "function",
+      "subtype": "embedding_dispatch",
+      "description": "获取嵌入向量：优先 Ollama，不可用时回退本地 bge-m3。",
+      "parent": "file-kb-manager-py",
+      "line": 1166
+    },
+    {
+      "id": "func-cross-encoder-rerank",
+      "label": "cross_encoder_rerank()",
+      "type": "function",
+      "subtype": "reranking",
+      "description": "sentence-transformers CrossEncoder bge-reranker-v2-m3 重排序。不可用时降级为线性降序。",
+      "parent": "file-kb-manager-py",
+      "line": 1240
+    },
+    {
+      "id": "func-show-status",
+      "label": "show_status()",
+      "type": "function",
+      "subtype": "status",
+      "description": "索引状态统计：源文件数、已索引文档/块数、ChromaDB 块数、最后构建时间、待更新文件数。",
+      "parent": "file-kb-manager-py",
+      "line": 2125
+    },
+    {
+      "id": "func-get-chunk-page",
+      "label": "get_chunk_page()",
+      "type": "function",
+      "subtype": "page_lookup",
+      "description": "查询 chunk 在原始 PDF 中的页码（懒加载 page_mapping.json）。",
+      "parent": "file-kb-manager-py",
+      "line": 68
+    },
+    {
+      "id": "evidence-rank-system",
+      "label": "证据等级体系 (Rank 1-8)",
+      "type": "concept",
+      "subtype": "evidence_system",
+      "description": "证据等级权重体系。rank 越小证据等级越高：1=国际权威指南(1.4), 2=国内权威指南(1.3), 3=国际专家共识(1.2), 4=国内专家共识(1.1), 5=临床试验/Meta分析(1.0), 6=真实世界研究(0.9), 7=病例系列(0.7), 8=个人专家意见(0.5), 0=未知(0.8)。",
+      "parent": "file-kb-manager-py"
+    },
+    {
+      "id": "org-evidence-map",
+      "label": "来源机构到证据等级映射",
+      "type": "concept",
+      "subtype": "evidence_system",
+      "description": "NCCN/ASCO/ESMO 到 rank 1, CSCO/CACA/ChineseGuideline 到 rank 2, SITC 到 rank 3, ExpertConsensus 到 rank 4。共识类自动降一级。",
+      "parent": "file-kb-manager-py"
+    },
+    {
+      "id": "year-weight-system",
+      "label": "年份加权体系",
+      "type": "concept",
+      "subtype": "evidence_system",
+      "description": "年份权重：2024+ 为 1.3, 2023 为 1.2, 2021-2022 为 1.1, 2019-2020 为 1.0, 更早为 0.85。",
+      "parent": "file-kb-manager-py"
+    },
+    {
+      "id": "func-agent-chat",
+      "label": "chat()",
+      "type": "function",
+      "subtype": "agent_loop",
+      "description": "Agent 主循环。System+User 到 LLM 到 Tool Call 到 Run Tool 到再循环到最终回答。最多 3 轮。",
+      "parent": "file-agent-py",
+      "line": 98
+    },
+    {
+      "id": "func-agent-call-llm",
+      "label": "call_llm()",
+      "type": "function",
+      "subtype": "llm_caller",
+      "description": "调用 DeepSeek API。支持 tools、stream、重试（3 次，含 400 限流重试）。temperature=0.1, max_tokens=4000。",
+      "parent": "file-agent-py",
+      "line": 44
+    },
+    {
+      "id": "func-agent-interactive",
+      "label": "interactive()",
+      "type": "function",
+      "subtype": "interactive_mode",
+      "description": "交互式对话模式：循环读取用户输入并调用 chat()。",
+      "parent": "file-agent-py",
+      "line": 152
+    },
+    {
+      "id": "const-system-prompt",
+      "label": "SYSTEM_PROMPT",
+      "type": "constant",
+      "subtype": "agent_prompt",
+      "description": "Agent 系统提示词：肿瘤科临床决策助手。核心规则：一次性检索、多学会对比、直接回答、诚实说明、引用来源。",
+      "parent": "file-agent-py",
+      "line": 29
+    },
+    {
+      "id": "func-build-page-map-main",
+      "label": "main()",
+      "type": "function",
+      "subtype": "build_main",
+      "description": "主流程：读取 ChromaDB, 按 source_file 分组, 逐文件匹配 MinerU JSON, 构建 page_mapping.json。支持 --fresh。",
+      "parent": "file-build-page-map-py",
+      "line": 121
+    },
+    {
+      "id": "func-find-page-from-json",
+      "label": "find_page_from_json()",
+      "type": "function",
+      "subtype": "page_matcher",
+      "description": "四级匹配策略：正文长句、正文短句、全文、section_title。跨页返回 start-end，未匹配估算加 ~。",
+      "parent": "file-build-page-map-py",
+      "line": 42
+    },
+    {
+      "id": "func-load-json-page-map",
+      "label": "load_json_page_map()",
+      "type": "function",
+      "subtype": "page_matcher",
+      "description": "读取 MinerU _content_list.json，提取 text 到 page_idx 映射。仅保留长度大于 20 字符的条目。",
+      "parent": "file-build-page-map-py",
+      "line": 16
+    },
+    {
+      "id": "dep-chromadb",
+      "label": "ChromaDB",
+      "type": "external_dependency",
+      "subtype": "vector_database",
+      "description": "持久化向量数据库。PersistentClient 路径由 KB_CHROMA_DIR 控制。余弦相似度空间。"
+    },
+    {
+      "id": "dep-ollama",
+      "label": "Ollama (bge-m3)",
+      "type": "external_dependency",
+      "subtype": "embedding_service",
+      "description": "Ollama 本地嵌入服务。bge-m3，向量维度 1024。本地 API http://localhost:11434。并发嵌入请求（默认 16 线程）。"
+    },
+    {
+      "id": "dep-cross-encoder",
+      "label": "sentence-transformers CrossEncoder (bge-reranker-v2-m3)",
+      "type": "external_dependency",
+      "subtype": "reranker",
+      "description": "本地 CrossEncoder 重排序模型。CPU 推理，max_length=512。可被 KB_ENABLE_RERANKER 关闭。离线模式。"
+    },
+    {
+      "id": "dep-local-embed",
+      "label": "sentence-transformers (BAAI/bge-m3)",
+      "type": "external_dependency",
+      "subtype": "embedding_fallback",
+      "description": "本地 sentence-transformers 嵌入模型，Ollama 不可用时自动降级。"
+    },
+    {
+      "id": "dep-deepseek-api",
+      "label": "DeepSeek API",
+      "type": "external_dependency",
+      "subtype": "llm_service",
+      "description": "Agent 层 LLM 后端。默认模型 deepseek-v4-flash，API https://api.deepseek.com/v1。由 DEEPSEEK_API_KEY 配置。"
+    },
+    {
+      "id": "dep-fastapi-uvicorn",
+      "label": "FastAPI + Uvicorn",
+      "type": "external_dependency",
+      "subtype": "web_framework",
+      "description": "Web 模式服务器框架。FastAPI 由 DataCode.web_server.create_app 创建。Uvicorn 监听 0.0.0.0:8000。"
+    },
+    {
+      "id": "dep-langchain",
+      "label": "LangChain (可选)",
+      "type": "external_dependency",
+      "subtype": "framework",
+      "description": "可选依赖。未安装时 get_langchain_tools() 返回空列表。"
+    },
+    {
+      "id": "dep-mineru-json",
+      "label": "MinerU JSON (_content_list.json)",
+      "type": "external_dependency",
+      "subtype": "page_source",
+      "description": "MinerU PDF 解析器产出的 JSON 文件，含 text 到 page_idx 映射。"
+    },
+    {
+      "id": "dep-httpx",
+      "label": "httpx",
+      "type": "external_dependency",
+      "subtype": "http_client",
+      "description": "HTTP 客户端。用于调用 Ollama API 和 DeepSeek API。"
+    },
+    {
+      "id": "dep-beautifulsoup4",
+      "label": "BeautifulSoup4",
+      "type": "external_dependency",
+      "subtype": "html_parser",
+      "description": "HTML 解析器。用于 kb_manager 中将 HTML table 转为 Markdown 表格。"
+    },
+    {
+      "id": "dep-pymupdf",
+      "label": "PyMuPDF (fitz)",
+      "type": "external_dependency",
+      "subtype": "pdf_reader",
+      "description": "PDF 文件读取库。build_page_map.py 用于获取 PDF 实际页数。"
+    },
+    {
+      "id": "config-platform-yaml",
+      "label": "Data/platform.yaml",
+      "type": "configuration",
+      "subtype": "platform_config",
+      "description": "平台主配置文件。含 LLM 配置、Agent 配置等。由 ConfigManager 加载。"
+    },
+    {
+      "id": "config-pipeline-yaml",
+      "label": "Data/skills/pipeline.yaml",
+      "type": "configuration",
+      "subtype": "pipeline_config",
+      "description": "流水线步骤定义。指定 Skill 串行执行顺序。"
+    },
+    {
+      "id": "config-params-txt",
+      "label": "TempData/params.txt",
+      "type": "configuration",
+      "subtype": "runtime_params",
+      "description": "CLI 模式运行时参数。两行一组键值对。支持 # 注释。"
+    },
+    {
+      "id": "config-env",
+      "label": ".env 环境变量",
+      "type": "configuration",
+      "subtype": "environment",
+      "description": "环境变量配置。影响 KB_CHROMA_DIR, KB_META_PATH, KB_PAGE_MAP_PATH, KB_COLLECTION_NAME 等。"
+    },
+    {
+      "id": "data-page-mapping-json",
+      "label": "page_mapping.json",
+      "type": "data_file",
+      "subtype": "page_map",
+      "description": "Chunk_id 到 PDF 页码映射文件。由 build_page_map.py 构建，懒加载。"
+    },
+    {
+      "id": "data-failed-chunks-jsonl",
+      "label": "failed_chunks.jsonl",
+      "type": "data_file",
+      "subtype": "failure_log",
+      "description": "未能嵌入的 chunk 记录。用于 retry_failed_chunks 补跑。"
+    },
+    {
+      "id": "data-index-meta-json",
+      "label": "index_meta.json",
+      "type": "data_file",
+      "subtype": "index_metadata",
+      "description": "索引元数据。含 last_build, total_documents, total_chunks, file_hashes。"
+    },
+    {
+      "id": "data-guidelines-dir",
+      "label": "guidelines/ 目录",
+      "type": "directory",
+      "subtype": "source_docs",
+      "description": "指南源文件目录。279 篇肿瘤临床指南的 .md 文件（由 PDF 经 MinerU 转换）。含 ocr/ 和 hybrid_auto/ 子目录。"
+    },
+    {
+      "id": "data-chroma-db-dir",
+      "label": "chroma_db/ 目录",
+      "type": "directory",
+      "subtype": "vector_store",
+      "description": "ChromaDB 持久化向量数据库目录。路径由 KB_CHROMA_DIR 控制。"
+    },
+    {
+      "id": "module-datacode-shared",
+      "label": "DataCode/_shared.py",
+      "type": "module",
+      "subtype": "shared_utilities",
+      "description": "共享工具模块。提供 load_env() 和 build_llm_candidates()。"
+    },
+    {
+      "id": "module-datacode-config-manager",
+      "label": "DataCode/config_manager.py",
+      "type": "module",
+      "subtype": "configuration",
+      "description": "配置管理器。加载 platform.yaml 和 agents 配置。含验证。"
+    },
+    {
+      "id": "module-datacode-tool-registry",
+      "label": "DataCode/tool_registry.py",
+      "type": "module",
+      "subtype": "tool_system",
+      "description": "工具注册中心。管理内置工具和 Agent 可用工具列表。"
+    },
+    {
+      "id": "module-datacode-builtin-tools",
+      "label": "DataCode/builtin_tools.py",
+      "type": "module",
+      "subtype": "tool_system",
+      "description": "内置工具工厂函数。含文件、记忆、待办、RAG 查询工具创建。"
+    },
+    {
+      "id": "module-datacode-agent-manager",
+      "label": "DataCode/agent_manager.py",
+      "type": "module",
+      "subtype": "agent_system",
+      "description": "Agent 管理器。管理 Agent 配置和创建。"
+    },
+    {
+      "id": "module-datacode-skill-executor",
+      "label": "DataCode/skill_executor.py",
+      "type": "module",
+      "subtype": "execution_engine",
+      "description": "Skill 执行器。加载 Skill、执行流水线、处理 LLM 候选。"
+    },
+    {
+      "id": "module-datacode-knowledge-base",
+      "label": "DataCode/knowledge_base.py",
+      "type": "module",
+      "subtype": "knowledge_integration",
+      "description": "RAGKnowledgeBase 封装。集成到 Agent 系统的知识库接口。"
+    },
+    {
+      "id": "module-datacode-web-server",
+      "label": "DataCode/web_server.py",
+      "type": "module",
+      "subtype": "web_layer",
+      "description": "FastAPI Web 服务端。提供 REST API 和前端服务。"
+    },
+    {
+      "id": "module-datacode-memory-store",
+      "label": "DataCode/memory_store.py",
+      "type": "module",
+      "subtype": "memory_system",
+      "description": "记忆存储。Long-term 和 session 级记忆。"
+    },
+    {
+      "id": "module-datacode-todo-manager",
+      "label": "DataCode/todo_manager.py",
+      "type": "module",
+      "subtype": "utility",
+      "description": "待办事项管理器。"
+    },
+    {
+      "id": "module-datacode-execution-logger",
+      "label": "DataCode/execution_logger.py",
+      "type": "module",
+      "subtype": "logging",
+      "description": "执行日志记录器。CLI 模式使用。"
+    },
+    {
+      "id": "module-datacode-skill-parser",
+      "label": "DataCode/skill_parser.py",
+      "type": "module",
+      "subtype": "skill_system",
+      "description": "Skill 解析器。从 Data/skills/ 目录解析 Skill 定义。"
+    },
+    {
+      "id": "arch-three-layer",
+      "label": "三层架构：Tool 到 kb_manager 到 ChromaDB",
+      "type": "architecture",
+      "subtype": "layered_pattern",
+      "description": "知识库检索三层架构：tool.py (业务逻辑) 到 kb_manager.py (引擎层) 到 ChromaDB (数据持久)。"
+    },
+    {
+      "id": "arch-dual-recall",
+      "label": "双路召回策略 (Dual Recall)",
+      "type": "architecture",
+      "subtype": "retrieval_pattern",
+      "description": "同时执行带过滤和无过滤两次向量检索，合并去重。解决 ChromaDB 1.5.x where 不稳定。"
+    },
+    {
+      "id": "arch-hybrid-search",
+      "label": "混合检索排序流程",
+      "type": "architecture",
+      "subtype": "retrieval_pattern",
+      "description": "向量检索 (bge-m3) 到 候选合并 到 CrossEncoder 精排 到 融合排序。"
+    },
+    {
+      "id": "arch-multi-org-search",
+      "label": "多机构分机构检索",
+      "type": "architecture",
+      "subtype": "retrieval_pattern",
+      "description": "逐机构独立查询 ChromaDB，合并后精排，强制机构多样性均衡。"
+    },
+    {
+      "id": "arch-parent-child-chunking",
+      "label": "父子分块 + 段落重叠",
+      "type": "architecture",
+      "subtype": "chunking_pattern",
+      "description": "H2/H3 标题切分，超 500 token 时分段。段落重叠 1 段。"
+    },
+    {
+      "id": "arch-failure-recovery",
+      "label": "多层失败恢复机制",
+      "type": "architecture",
+      "subtype": "resilience_pattern",
+      "description": "Ollama 500 重试 到 多级文本降级 到 补偿重试 到 failed_chunks.jsonl 到 retry_failed_chunks()。"
+    },
+    {
+      "id": "arch-tool-registration",
+      "label": "双框架工具注册",
+      "type": "architecture",
+      "subtype": "tool_pattern",
+      "description": "同时支持 OpenAI function calling 和 LangChain StructuredTool 格式。"
+    }
+  ],
+  "edges": [
+    {
+      "source": "func-main",
+      "target": "func-run-web",
+      "label": "dispatches_to",
+      "type": "control_flow"
+    },
+    {
+      "source": "func-main",
+      "target": "func-run-cli",
+      "label": "dispatches_to",
+      "type": "control_flow"
+    },
+    {
+      "source": "func-main",
+      "target": "func-run-blank",
+      "label": "dispatches_to",
+      "type": "control_flow"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-shared",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-config-manager",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-tool-registry",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-builtin-tools",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-agent-manager",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-knowledge-base",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-skill-executor",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-memory-store",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-todo-manager",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-web-server",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-main-py",
+      "target": "module-datacode-execution-logger",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "func-run-cli",
+      "target": "module-datacode-skill-parser",
+      "label": "imports",
+      "type": "import"
+    },
+    {
+      "source": "file-tool-py",
+      "target": "file-kb-manager-py",
+      "label": "imports query_knowledge etc.",
+      "type": "import"
+    },
+    {
+      "source": "file-agent-py",
+      "target": "file-tool-py",
+      "label": "imports TOOLS, run_agent_tool",
+      "type": "import"
+    },
+    {
+      "source": "func-agent-call-llm",
+      "target": "dep-deepseek-api",
+      "label": "calls",
+      "type": "api_call"
+    },
+    {
+      "source": "func-agent-chat",
+      "target": "func-agent-call-llm",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "file-build-page-map-py",
+      "target": "file-kb-manager-py",
+      "label": "imports GUIDELINES_DIR etc.",
+      "type": "import"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-parse-query-intent",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-bilingual-expand",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-multi-org-query",
+      "label": "calls (多机构时)",
+      "type": "call"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-query-knowledge",
+      "label": "calls (单机构时)",
+      "type": "call"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-deduplicate-fill",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-ensure-org-diversity",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-format-for-llm",
+      "label": "calls (mode=llm)",
+      "type": "call"
+    },
+    {
+      "source": "func-search-guidelines",
+      "target": "func-format-for-agent",
+      "label": "calls (mode=agent)",
+      "type": "call"
+    },
+    {
+      "source": "func-search-medical-guidelines",
+      "target": "func-search-guidelines",
+      "label": "wraps",
+      "type": "call"
+    },
+    {
+      "source": "func-multi-org-query",
+      "target": "dep-chromadb",
+      "label": "queries per-org",
+      "type": "db_call"
+    },
+    {
+      "source": "func-multi-org-query",
+      "target": "func-ollama-embed",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-multi-org-query",
+      "target": "func-cross-encoder-rerank",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-query-knowledge",
+      "target": "func-get-embedding",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-query-knowledge",
+      "target": "func-get-chroma-collection",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-query-knowledge",
+      "target": "func-cross-encoder-rerank",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-query-knowledge",
+      "target": "dep-chromadb",
+      "label": "queries (双路召回)",
+      "type": "db_call"
+    },
+    {
+      "source": "func-build-index",
+      "target": "func-get-chroma-collection",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-build-index",
+      "target": "func-extract-metadata",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-build-index",
+      "target": "func-chunk-markdown",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-build-index",
+      "target": "func-ollama-embed",
+      "label": "calls (并发)",
+      "type": "call"
+    },
+    {
+      "source": "func-resume-missing-index",
+      "target": "func-get-chroma-collection",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-resume-missing-index",
+      "target": "func-extract-metadata",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-resume-missing-index",
+      "target": "func-chunk-markdown",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-get-embedding",
+      "target": "func-ollama-embed",
+      "label": "primary",
+      "type": "call"
+    },
+    {
+      "source": "func-get-embedding",
+      "target": "func-local-embed",
+      "label": "fallback",
+      "type": "call"
+    },
+    {
+      "source": "func-ollama-embed",
+      "target": "dep-ollama",
+      "label": "HTTP POST /api/embeddings",
+      "type": "api_call"
+    },
+    {
+      "source": "func-local-embed",
+      "target": "dep-local-embed",
+      "label": "loads model",
+      "type": "dependency"
+    },
+    {
+      "source": "func-cross-encoder-rerank",
+      "target": "dep-cross-encoder",
+      "label": "loads (lazy)",
+      "type": "dependency"
+    },
+    {
+      "source": "func-get-chroma-collection",
+      "target": "dep-chromadb",
+      "label": "initializes",
+      "type": "db_call"
+    },
+    {
+      "source": "func-get-chroma-collection",
+      "target": "data-chroma-db-dir",
+      "label": "persists_to",
+      "type": "data_flow"
+    },
+    {
+      "source": "func-get-chunk-page",
+      "target": "data-page-mapping-json",
+      "label": "reads (lazy)",
+      "type": "data_flow"
+    },
+    {
+      "source": "func-build-page-map-main",
+      "target": "dep-chromadb",
+      "label": "reads ChromaDB",
+      "type": "db_call"
+    },
+    {
+      "source": "func-build-page-map-main",
+      "target": "data-page-mapping-json",
+      "label": "writes",
+      "type": "data_flow"
+    },
+    {
+      "source": "func-build-page-map-main",
+      "target": "data-guidelines-dir",
+      "label": "reads MinerU JSON",
+      "type": "data_flow"
+    },
+    {
+      "source": "func-find-page-from-json",
+      "target": "func-load-json-page-map",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-find-page-from-json",
+      "target": "dep-mineru-json",
+      "label": "reads",
+      "type": "data_flow"
+    },
+    {
+      "source": "config-platform-yaml",
+      "target": "module-datacode-config-manager",
+      "label": "loaded_by",
+      "type": "config_flow"
+    },
+    {
+      "source": "config-pipeline-yaml",
+      "target": "module-datacode-skill-executor",
+      "label": "loaded_by",
+      "type": "config_flow"
+    },
+    {
+      "source": "config-params-txt",
+      "target": "func-load-params",
+      "label": "loaded_by",
+      "type": "config_flow"
+    },
+    {
+      "source": "config-env",
+      "target": "file-kb-manager-py",
+      "label": "influences",
+      "type": "config_flow"
+    },
+    {
+      "source": "config-env",
+      "target": "file-agent-py",
+      "label": "influences",
+      "type": "config_flow"
+    },
+    {
+      "source": "func-run-web",
+      "target": "dep-fastapi-uvicorn",
+      "label": "starts",
+      "type": "dependency"
+    },
+    {
+      "source": "func-run-web",
+      "target": "config-env",
+      "label": "reads PORT",
+      "type": "config_flow"
+    },
+    {
+      "source": "func-agent-chat",
+      "target": "func-run-agent-tool",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-run-agent-tool",
+      "target": "func-search-medical-guidelines",
+      "label": "dispatches_to",
+      "type": "call"
+    },
+    {
+      "source": "func-run-agent-tool",
+      "target": "func-get-source-detail",
+      "label": "dispatches_to",
+      "type": "call"
+    },
+    {
+      "source": "data-guidelines-dir",
+      "target": "func-build-index",
+      "label": "read_from",
+      "type": "data_flow"
+    },
+    {
+      "source": "func-build-index",
+      "target": "data-chroma-db-dir",
+      "label": "writes_to",
+      "type": "data_flow"
+    },
+    {
+      "source": "func-build-index",
+      "target": "data-index-meta-json",
+      "label": "writes_to",
+      "type": "data_flow"
+    },
+    {
+      "source": "func-build-index",
+      "target": "data-failed-chunks-jsonl",
+      "label": "writes_to (on failure)",
+      "type": "data_flow"
+    },
+    {
+      "source": "data-index-meta-json",
+      "target": "func-show-status",
+      "label": "read_by",
+      "type": "data_flow"
+    },
+    {
+      "source": "arch-three-layer",
+      "target": "file-tool-py",
+      "label": "business_layer",
+      "type": "realization"
+    },
+    {
+      "source": "arch-three-layer",
+      "target": "file-kb-manager-py",
+      "label": "engine_layer",
+      "type": "realization"
+    },
+    {
+      "source": "arch-three-layer",
+      "target": "dep-chromadb",
+      "label": "persistence_layer",
+      "type": "realization"
+    },
+    {
+      "source": "arch-dual-recall",
+      "target": "func-query-knowledge",
+      "label": "implemented_in",
+      "type": "realization"
+    },
+    {
+      "source": "arch-hybrid-search",
+      "target": "func-query-knowledge",
+      "label": "implemented_in",
+      "type": "realization"
+    },
+    {
+      "source": "arch-multi-org-search",
+      "target": "func-multi-org-query",
+      "label": "implemented_in",
+      "type": "realization"
+    },
+    {
+      "source": "arch-parent-child-chunking",
+      "target": "func-chunk-markdown",
+      "label": "implemented_in",
+      "type": "realization"
+    },
+    {
+      "source": "arch-failure-recovery",
+      "target": "func-ollama-embed",
+      "label": "first_layer",
+      "type": "realization"
+    },
+    {
+      "source": "arch-failure-recovery",
+      "target": "func-retry-failed-chunks",
+      "label": "last_layer",
+      "type": "realization"
+    },
+    {
+      "source": "arch-tool-registration",
+      "target": "func-get-openai-tools",
+      "label": "openai_format",
+      "type": "realization"
+    },
+    {
+      "source": "arch-tool-registration",
+      "target": "func-get-langchain-tools",
+      "label": "langchain_format",
+      "type": "realization"
+    },
+    {
+      "source": "evidence-rank-system",
+      "target": "func-extract-metadata",
+      "label": "used_by",
+      "type": "reference"
+    },
+    {
+      "source": "evidence-rank-system",
+      "target": "func-extract-chunk-metadata",
+      "label": "used_by",
+      "type": "reference"
+    },
+    {
+      "source": "evidence-rank-system",
+      "target": "org-evidence-map",
+      "label": "defines",
+      "type": "reference"
+    },
+    {
+      "source": "year-weight-system",
+      "target": "func-query-knowledge",
+      "label": "used_by",
+      "type": "reference"
+    },
+    {
+      "source": "year-weight-system",
+      "target": "func-multi-org-query",
+      "label": "used_by",
+      "type": "reference"
+    },
+    {
+      "source": "func-run-web",
+      "target": "func-init-web-app",
+      "label": "calls",
+      "type": "call"
+    },
+    {
+      "source": "func-init-web-app",
+      "target": "module-datacode-knowledge-base",
+      "label": "instantiates RagKnowledgeBase",
+      "type": "call"
+    },
+    {
+      "source": "func-init-web-app",
+      "target": "module-datacode-builtin-tools",
+      "label": "registers tools",
+      "type": "call"
+    },
+    {
+      "source": "func-run-cli",
+      "target": "module-datacode-builtin-tools",
+      "label": "registers tools",
+      "type": "call"
+    },
+    {
+      "source": "module-datacode-web-server",
+      "target": "func-run-web",
+      "label": "create_app called_by",
+      "type": "call"
+    }
+  ]
+}

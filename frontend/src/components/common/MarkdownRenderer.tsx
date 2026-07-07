@@ -46,9 +46,11 @@ function csvToPipeTables(text: string): string {
       const sep = '| ' + block[0].cols.map(() => '---').join(' | ') + ' |'
       const rows = block.slice(1).map(r => '| ' + r.cols.join(' | ') + ' |')
       result.push('', header, sep, ...rows, '')
+    } else if (block.length > 0) {
+      result.push(...block.map(b => b.line))
+      continue
     } else {
-      if (block.length > 0) result.push(...block.map(b => b.line))
-      else result.push(lines[i])
+      result.push(lines[i])
       i++
     }
   }
@@ -67,7 +69,12 @@ function preprocess(raw: string): string {
   text = text.replace(/<\/?details\s*>/gi, '')
   // 0b. 孤立的 <b> </b> 转为 ** **
   text = text.replace(/<b>\s*(.*?)\s*<\/b>/gi, '**$1**')
-  // 0c. CSV → 管道表
+  // 0c. 清理 OCR/模型残留的轻量 HTML 标签，避免直接显示在报告中
+  text = text.replace(/<sub>\s*([\s\S]*?)\s*<\/sub>/gi, '$1')
+  text = text.replace(/<sup>\s*([\s\S]*?)\s*<\/sup>/gi, '$1')
+  text = text.replace(/<\/?(?:i|u|font|span)\b[^>]*>/gi, '')
+  text = text.replace(/&nbsp;/gi, ' ')
+  // 0d. CSV → 管道表
   text = csvToPipeTables(text)
 
   // 1. LaTeX 公式内换行 → 空格

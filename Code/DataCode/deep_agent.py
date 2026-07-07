@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import ssl
+import os
 
 import httpx
 from typing import TYPE_CHECKING, Any
@@ -30,6 +31,33 @@ def build_ssl_context() -> ssl.SSLContext:
     ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     return ctx
+
+
+def llm_trust_env_proxy() -> bool:
+    """Whether LLM clients should honor HTTP_PROXY/HTTPS_PROXY from the host env."""
+    return os.environ.get("MEDAGENT_LLM_TRUST_ENV_PROXY", "").lower() in ("1", "true", "yes")
+
+
+def llm_timeout_seconds(default: float = 120.0) -> float:
+    raw = os.environ.get("MEDAGENT_LLM_HTTP_TIMEOUT", "")
+    try:
+        return max(10.0, float(raw)) if raw else default
+    except ValueError:
+        return default
+
+
+def make_sync_llm_http_client() -> httpx.Client:
+    return httpx.Client(
+        timeout=llm_timeout_seconds(),
+        trust_env=llm_trust_env_proxy(),
+    )
+
+
+def make_async_llm_http_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=llm_timeout_seconds(),
+        trust_env=llm_trust_env_proxy(),
+    )
 
 
 def create_deep_agent(
@@ -74,6 +102,8 @@ def create_deep_agent(
             api_key=api_key or "dummy",
             temperature=temperature,
             default_headers={"User-Agent": "curl/8.17.0"},
+            http_client=make_sync_llm_http_client(),
+            http_async_client=make_async_llm_http_client(),
         )
     # LLMCallbackHandler 通过 agent.ainvoke(config={"callbacks": [...]}) 传入，
     # 不再绑定到 LLM 客户端构造函数（避免共享客户端时回调冲突）。

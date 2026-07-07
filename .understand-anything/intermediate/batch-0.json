@@ -1,0 +1,1497 @@
+{
+  "nodes": [
+    {
+      "id": "file:Code/DataCode/agent_manager.py",
+      "type": "file",
+      "name": "agent_manager.py",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Agent lifecycle management: main/sub agent startup, parallel sub-agent scheduling, LLM client caching, skill execution with context injection",
+      "tags": ["agent-manager", "lifecycle", "sub-agent", "parallel", "llm-cache", "skill-execution"],
+      "complexity": "high",
+      "languageNotes": "Python核心模块 — 845行"
+    },
+    {
+      "id": "file:Code/DataCode/skill_executor.py",
+      "type": "file",
+      "name": "skill_executor.py",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Pipeline execution engine: orchestrates 10-step report generation pipeline, supports Tab (parallel) and Pipeline (serial) modes, LLM multi-candidate auto-failover routing, streaming chat",
+      "tags": ["skill-executor", "pipeline", "llm-routing", "chat", "report-generation", "streaming", "tab-mode"],
+      "complexity": "very-high",
+      "languageNotes": "Python核心模块 — 1388行，系统最复杂的编排引擎"
+    },
+    {
+      "id": "file:Code/DataCode/builtin_tools.py",
+      "type": "file",
+      "name": "builtin_tools.py",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Built-in tool factories: file read/write with path whitelist, batch PDF-to-MD conversion (PyMuPDF/PyPDF2 fallback), RAG knowledge base query, memory persistence, todo list management",
+      "tags": ["tools", "built-in", "rag", "pdf-conversion", "file-io", "memory", "todo", "path-security"],
+      "complexity": "medium",
+      "languageNotes": "Python工具模块 — 362行"
+    },
+    {
+      "id": "file:Code/DataCode/tool_registry.py",
+      "type": "file",
+      "name": "tool_registry.py",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Tool registry: defines ToolDef dataclass, ToolRegistry with register/search/list, JSON schema to Pydantic conversion, and ToolSearch/SkillSearch meta-tool factories for Agent self-discovery",
+      "tags": ["registry", "tool-definition", "tool-search", "skill-search", "pydantic", "langchain"],
+      "complexity": "low",
+      "languageNotes": "Python工具注册模块 — 143行"
+    },
+    {
+      "id": "file:Code/DataCode/execute_tool.py",
+      "type": "file",
+      "name": "execute_tool.py",
+      "filePath": "Code/DataCode/execute_tool.py",
+      "summary": "Unified tool executor with flyweight pattern: permission whitelist check, execution logging, sync/async dual-path execution, todo nag injection, LangChain StructuredTool adapter",
+      "tags": ["tool-execution", "permission", "logging", "flyweight", "async"],
+      "complexity": "low",
+      "languageNotes": "Python工具执行模块 — 133行"
+    },
+    {
+      "id": "file:Code/DataCode/deep_agent.py",
+      "type": "file",
+      "name": "deep_agent.py",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "LangGraph ReAct Agent factory: creates autonomous (standard ReAct) or sequential (step-chain) agents, manages LLM client creation with SSL/HTTP config, parallel/serial tool call control, LLM client sharing",
+      "tags": ["agent-factory", "re-act", "langgraph", "sequential-agent", "ssl", "llm-client", "langchain"],
+      "complexity": "high",
+      "languageNotes": "PythonAgent工厂模块 — 254行"
+    },
+    {
+      "id": "file:Code/DataCode/llm_callback.py",
+      "type": "file",
+      "name": "llm_callback.py",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "LLM call tracing: global LLMCallTracker singleton with in-memory ring buffer for recent call history, and LangChain BaseCallbackHandler for automatic ChatOpenAI invocation recording with key sanitization",
+      "tags": ["callback", "tracing", "llm-monitoring", "debug", "langchain", "ring-buffer"],
+      "complexity": "medium",
+      "languageNotes": "Python回调追踪模块 — 210行"
+    },
+    {
+      "id": "file:Code/DataCode/config_manager.py",
+      "type": "file",
+      "name": "config_manager.py",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "YAML hierarchical configuration: loads platform.yaml and agent configs from directory structure, supports env var override for API keys, dot-notation access, validation, and watchdog file-change reloading",
+      "tags": ["config", "yaml", "agent-config", "file-watcher", "watchdog"],
+      "complexity": "medium",
+      "languageNotes": "Python配置管理模块 — 155行"
+    },
+
+    {
+      "id": "class:Code/DataCode/agent_manager.py:AgentManager",
+      "type": "class",
+      "name": "AgentManager",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Manages the complete lifecycle of LangGraph ReAct Agents: creates main agent and sub-agents from config, dynamically spawns skill-specific agents, schedules parallel sub-agent execution with Semaphore concurrency control, caches LLM clients for reuse, injects patient data context with adaptive truncation",
+      "tags": ["agent-manager", "lifecycle", "parallel-scheduling", "llm-cache", "sub-agent"],
+      "complexity": "high"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.__init__",
+      "type": "function",
+      "name": "__init__",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Initializes AgentManager with config, registry, memory, logger, context/todo managers; sets up parallel tool call flag and LLM client cache dict",
+      "tags": ["constructor", "init"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager._get_or_create_llm",
+      "type": "function",
+      "name": "_get_or_create_llm",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Returns cached ChatOpenAI instance keyed by (model, base_url, api_key, proxy_flag); creates new one if not found, with temperature from config and custom HTTP client",
+      "tags": ["llm-cache", "chatopenai", "client-reuse"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.start_main_agent",
+      "type": "function",
+      "name": "start_main_agent",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Creates and stores the main LangGraph ReAct Agent using 'main' agent config",
+      "tags": ["agent-startup", "main-agent"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.discover_sub_agents",
+      "type": "function",
+      "name": "discover_sub_agents",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Discovers and creates all configured sub-agents (except 'main'), returning list of created names",
+      "tags": ["sub-agent", "discovery"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_agent",
+      "type": "function",
+      "name": "spawn_agent",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Dynamically creates a temporary agent with given name, system prompt, and optional model override; raises if name already exists",
+      "tags": ["dynamic-agent", "spawn"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill",
+      "type": "function",
+      "name": "run_skill",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Executes a Skill by creating a temporary ReAct Agent with assembled tools, injecting patient files/knowledge/prior reports into user message (not system prompt) to avoid per-round context bloat, manages memory offloading and context compression, 600s timeout for complex steps",
+      "tags": ["skill-execution", "context-injection", "memory-offload", "timeout"],
+      "complexity": "high"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent",
+      "type": "function",
+      "name": "spawn_sub_agent",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Creates a temporary sub-agent to execute a skill, auto-destroys after completion",
+      "tags": ["sub-agent", "skill-execution"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated",
+      "type": "function",
+      "name": "spawn_sub_agent_isolated",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Creates an isolated sub-agent with independent context injected as JSON in system prompt; applies complexity-based recursion limits; 120s timeout; auto-destroys after execution",
+      "tags": ["isolated-agent", "sub-agent", "context-injection"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.schedule_sub_agents",
+      "type": "function",
+      "name": "schedule_sub_agents",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Serial scheduling: executes multiple sub-agent tasks one by one, returning ordered results",
+      "tags": ["serial", "scheduling"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agents_parallel",
+      "type": "function",
+      "name": "spawn_sub_agents_parallel",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Parallel sub-agent execution: uses asyncio.Semaphore(max_concurrent=4) for concurrency control, each sub-agent isolated via spawn_sub_agent_isolated, individual failures caught as Exception objects without affecting others",
+      "tags": ["parallel", "concurrency", "semaphore", "sub-agent"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.destroy_agent",
+      "type": "function",
+      "name": "destroy_agent",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Removes a named agent from the registry; prevents destruction of 'main' agent",
+      "tags": ["agent-cleanup", "destroy"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.list_agents",
+      "type": "function",
+      "name": "list_agents",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Returns all registered agent names",
+      "tags": ["query"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.get_agent_status",
+      "type": "function",
+      "name": "get_agent_status",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Returns status dict for a named agent or None",
+      "tags": ["query"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.get_agent",
+      "type": "function",
+      "name": "get_agent",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Returns the callable agent instance by name",
+      "tags": ["query"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager.route_message",
+      "type": "function",
+      "name": "route_message",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Routes a message to a target agent asynchronously via ainvoke",
+      "tags": ["message-routing"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools",
+      "type": "function",
+      "name": "_assemble_tools",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Assembles agent toolset: ToolSearch + SkillSearch meta-tools + ExecuteTool, filtered by agent's available_tools config",
+      "tags": ["tool-assembly"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill",
+      "type": "function",
+      "name": "_assemble_tools_for_skill",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Assembles skill execution toolset: base tools plus sessions_spawn and sessions_spawn_parallel for sub-agent creation",
+      "tags": ["tool-assembly", "skill"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager._run_knowledge_retrieval_direct",
+      "type": "function",
+      "name": "_run_knowledge_retrieval_direct",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Direct RAG execution bypassing LLM: extracts query from context dict with recursive key search, invokes rag_query tool handler directly with top_k control",
+      "tags": ["rag", "knowledge-retrieval", "direct-execution"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_tool",
+      "type": "function",
+      "name": "_create_sessions_spawn_tool",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Creates sessions_spawn ToolDef: agent-callable tool that resolves sub-skill path, parses SKILL.md, spawns isolated sub-agent, returns sub-agent output; special-cases knowledge-retrieval for direct RAG",
+      "tags": ["tool-creation", "sessions-spawn", "sub-agent"],
+      "complexity": "high"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_parallel_tool",
+      "type": "function",
+      "name": "_create_sessions_spawn_parallel_tool",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Creates sessions_spawn_parallel ToolDef: agent-callable tool that spawns multiple isolated sub-agents concurrently via asyncio.gather, returns all outputs assembled",
+      "tags": ["tool-creation", "parallel-spawn", "sub-agent"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:_build_file_index",
+      "type": "function",
+      "name": "_build_file_index",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Generates lightweight file index (name+size only) from JSON patient files, used by non-clinical steps to avoid 80KB context injection",
+      "tags": ["file-index", "context-optimization"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:_truncate_files_text",
+      "type": "function",
+      "name": "_truncate_files_text",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Truncates patient data to 15KB max with per-file 300-char limit; handles both JSON array and Markdown formats, avoids multi-byte UTF-8 cut",
+      "tags": ["truncation", "context-window", "utf-8"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:_truncate_prior_reports",
+      "type": "function",
+      "name": "_truncate_prior_reports",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Truncates prior reports text to 30KB max with truncation note",
+      "tags": ["truncation", "prior-reports"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:resolve_sub_skill_path",
+      "type": "function",
+      "name": "resolve_sub_skill_path",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Resolves a sub-skill reference path: tries relative to parent skill dir, then falls back to global skills base dir; raises FileNotFoundError if unresolved",
+      "tags": ["path-resolution", "sub-skill"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/agent_manager.py:_get_sub_agent_recursion_limit",
+      "type": "function",
+      "name": "_get_sub_agent_recursion_limit",
+      "filePath": "Code/DataCode/agent_manager.py",
+      "summary": "Returns recursion limit based on skill complexity: 15 for simple prefixes, 35 for full skills",
+      "tags": ["recursion-limit", "complexity"],
+      "complexity": "low"
+    },
+
+    {
+      "id": "class:Code/DataCode/skill_executor.py:PipelineStep",
+      "type": "class",
+      "name": "PipelineStep",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Dataclass representing a single pipeline step with name, display_name, skill_file, keywords for KB relevance scoring, and has_schema flag",
+      "tags": ["dataclass", "pipeline-step"],
+      "complexity": "low"
+    },
+    {
+      "id": "class:Code/DataCode/skill_executor.py:SkillExecutor",
+      "type": "class",
+      "name": "SkillExecutor",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Core orchestration engine: bridges Web layer and Agent layer; supports Tab mode (parallel multi-skill) and Pipeline mode (serial 10-step report generation); manages LLM multi-candidate auto-failover with transient error retry; handles streaming chat, report assembly, JSON/Markdown output normalization, KB query with step-specific relevance scoring",
+      "tags": ["orchestrator", "pipeline", "llm-routing", "chat", "report", "fallback", "retry"],
+      "complexity": "very-high"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor.__init__",
+      "type": "function",
+      "name": "__init__",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Initializes SkillExecutor with agent_manager, knowledge_base, llm_candidates list, disabled_providers set, and pipeline steps",
+      "tags": ["constructor"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor.load_skills",
+      "type": "function",
+      "name": "load_skills",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Parses all SKILL.md files from a directory and registers them",
+      "tags": ["skill-loading", "parsing"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor.load_pipeline",
+      "type": "function",
+      "name": "load_pipeline",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Loads pipeline step configuration from YAML",
+      "tags": ["pipeline", "config"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._format_knowledge",
+      "type": "function",
+      "name": "_format_knowledge",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Formats KB query results into ranked text with evidence level, edition, and source info",
+      "tags": ["knowledge-base", "formatting"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._apply_llm_candidate",
+      "type": "function",
+      "name": "_apply_llm_candidate",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Applies LLM candidate config (api_key, base_url, model) to the platform config dynamically",
+      "tags": ["llm-routing", "config-switching"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._candidate_names",
+      "type": "function",
+      "name": "_candidate_names",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Returns comma-separated names of all LLM candidates for error messaging",
+      "tags": ["llm-routing"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._is_step_specific_error",
+      "type": "function",
+      "name": "_is_step_specific_error",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Classifies whether an error is step-specific (Agent recursion, context limit) vs infrastructure-wide (auth, timeout, rate-limit, network); only infrastructure errors cascade-disable subsequent steps",
+      "tags": ["error-classification", "resilience"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._classify_llm_error",
+      "type": "function",
+      "name": "_classify_llm_error",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Classifies LLM errors into 7 categories: auth failure, timeout, recursion limit, context exceeded, rate limit, server error, network failure; returns user-facing Chinese labels",
+      "tags": ["error-classification", "llm"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_system_prompt",
+      "type": "function",
+      "name": "_extract_system_prompt",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Extracts ## System Prompt code block from SKILL.md body via regex",
+      "tags": ["markdown-parsing", "regex"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_json",
+      "type": "function",
+      "name": "_extract_json",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Extracts JSON from model output: removes code fences, finds outermost {} braces, auto-fixes trailing commas, balances braces",
+      "tags": ["json-parsing", "extraction"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._is_invalid_agent_output",
+      "type": "function",
+      "name": "_is_invalid_agent_output",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Detects LangGraph recursion-limit fallback messages (short, generic 'need more steps' patterns)",
+      "tags": ["validation", "agent-output"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._json_to_markdown",
+      "type": "function",
+      "name": "_json_to_markdown",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Converts JSON dict to readable Markdown, skipping internal fields and metadata",
+      "tags": ["formatting", "markdown"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._clean_agent_content",
+      "type": "function",
+      "name": "_clean_agent_content",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Strips agent monologue/planning text from report content: removes '### result' lines, code fence markers, structured-output headings, and agent internal monologue blocks",
+      "tags": ["cleaning", "agent-output", "post-processing"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_structured_from_markdown",
+      "type": "function",
+      "name": "_extract_structured_from_markdown",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "When LLM outputs Markdown instead of JSON, extracts structured fields by matching ## headings against a step-specific heading-to-field mapping; returns None if no match",
+      "tags": ["markdown-parsing", "fallback", "structured-extraction"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor.reset_disabled_providers",
+      "type": "function",
+      "name": "reset_disabled_providers",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Clears the set of disabled LLM providers for a fresh run",
+      "tags": ["llm-routing", "reset"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor.llm_status",
+      "type": "function",
+      "name": "llm_status",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Returns LLM status including candidates list, disabled providers, timeouts, proxy env info",
+      "tags": ["status", "llm", "debug"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_with_llm_candidates",
+      "type": "function",
+      "name": "_run_skill_with_llm_candidates",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Core LLM routing: iterates through candidates, applies provider config, retries transient errors once (rate-limit/timeout/server-error/network), skips disabled providers, raises classified RuntimeError on exhaustion",
+      "tags": ["llm-routing", "retry", "failover", "resilience"],
+      "complexity": "high"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_via_agent",
+      "type": "function",
+      "name": "_run_skill_via_agent",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Delegates skill execution to AgentManager.run_skill with step-specific recursion limits, validates output (rejects recursion-limit fallback messages), wraps result as JSON, tracks via LLMCallTracker",
+      "tags": ["skill-execution", "validation", "tracking"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_chat",
+      "type": "function",
+      "name": "execute_chat",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Main chat SSE stream: yields 'thinking' status, streams reasoning/token events via LLM multi-candidate failover, falls back to local file summary if all candidates fail",
+      "tags": ["chat", "streaming", "sse", "fallback"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._chunked",
+      "type": "function",
+      "name": "_chunked",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Splits text into fixed-size chunks for streaming",
+      "tags": ["utility"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_prompt",
+      "type": "function",
+      "name": "_build_chat_prompt",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Constructs chat message list: system prompt + recent history (last 8) + patient data block + user question",
+      "tags": ["prompt-building", "chat"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_fallback",
+      "type": "function",
+      "name": "_build_chat_fallback",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Builds offline-mode fallback text with patient file summary when no LLM available",
+      "tags": ["fallback", "offline"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._stream_main_llm",
+      "type": "function",
+      "name": "_stream_main_llm",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "OpenAI SDK streaming: creates AsyncOpenAI client, streams chat completions with reasoning_content support, tracks via LLMCallTracker, enforces idle timeout",
+      "tags": ["streaming", "openai-sdk", "reasoning"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills",
+      "type": "function",
+      "name": "execute_report_skills",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Full report pipeline: determines fast/full mode (skips 01-04 if OCR ready), queries KB with step-specific relevance scoring, executes steps serially with step-aware file budgets, generates tab_ready/token SSE events, writes pipeline timing logs and report JSON to disk, archives generated report context",
+      "tags": ["pipeline", "report", "sse", "orchestration", "logging", "persistence"],
+      "complexity": "very-high"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._write_generated_report_context",
+      "type": "function",
+      "name": "_write_generated_report_context",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Persists the current report as prior context for longitudinal comparison: generates Markdown and JSON formats via report_context module",
+      "tags": ["persistence", "prior-context", "report"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:SkillExecutor._background_clean_cache",
+      "type": "function",
+      "name": "_background_clean_cache",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Background task: cleans KB results using TextCleaner, updates in-memory cache",
+      "tags": ["background-task", "cleaning", "kb"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:load_pipeline_config",
+      "type": "function",
+      "name": "load_pipeline_config",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Loads and parses pipeline YAML configuration, returns list of PipelineStep dataclass instances",
+      "tags": ["pipeline", "yaml", "config"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:_load_step_schema",
+      "type": "function",
+      "name": "_load_step_schema",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Loads optional Function Calling schema.json for a pipeline step",
+      "tags": ["schema", "function-calling"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:_score_result_for_step",
+      "type": "function",
+      "name": "_score_result_for_step",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Scores a KB result by keyword frequency count for step-specific relevance sorting",
+      "tags": ["scoring", "kb", "relevance"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:_build_previous_summary",
+      "type": "function",
+      "name": "_build_previous_summary",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Builds dependency-aware previous results summary: only extracts predecessor steps' relevant fields, truncates per-field to 400 chars, total under 3000, fallback to last-3-steps with content_preview if over limit",
+      "tags": ["summary", "dependency", "pipeline", "truncation"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:_file_category_summary",
+      "type": "function",
+      "name": "_file_category_summary",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Auto-categorizes patient files by directory path, returns human-readable count summary",
+      "tags": ["categorization", "files", "summary"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:_first_content_snippet",
+      "type": "function",
+      "name": "_first_content_snippet",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Returns first non-empty file content snippet for preview",
+      "tags": ["utility"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:_format_files_for_prompt",
+      "type": "function",
+      "name": "_format_files_for_prompt",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Renders patient file list as Markdown with per-file and total character budgets; optionally adds OCR-complete header to prevent redundant PDF conversion by Agent",
+      "tags": ["formatting", "context-budget", "ocr"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/skill_executor.py:_has_loaded_ocr_content",
+      "type": "function",
+      "name": "_has_loaded_ocr_content",
+      "filePath": "Code/DataCode/skill_executor.py",
+      "summary": "Checks if any file has pre-loaded OCR Markdown content (route-level optimization)",
+      "tags": ["ocr", "optimization"],
+      "complexity": "low"
+    },
+
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:_resolve_and_check",
+      "type": "function",
+      "name": "_resolve_and_check",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Path resolution with whitelist enforcement: resolves relative path against project root, checks against allowed prefix list, raises ValueError on violation",
+      "tags": ["path-security", "whitelist"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:create_read_file_tool",
+      "type": "function",
+      "name": "create_read_file_tool",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Creates read_file ToolDef with 10MB limit, whitelisted to Data/TempData/Result/ paths",
+      "tags": ["tool-factory", "file-read"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:create_batch_pdf_conversion_tool",
+      "type": "function",
+      "name": "create_batch_pdf_conversion_tool",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Creates batch_pdf_to_md ToolDef: uses PyMuPDF (fitz) for text extraction, falls back to PyPDF2; outputs .md files and conversion_report.json",
+      "tags": ["tool-factory", "pdf-conversion", "batch"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:_convert_via_pypdf2",
+      "type": "function",
+      "name": "_convert_via_pypdf2",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "PyPDF2 fallback PDF-to-MD conversion when PyMuPDF is unavailable",
+      "tags": ["fallback", "pdf-conversion"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:create_write_file_tool",
+      "type": "function",
+      "name": "create_write_file_tool",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Creates write_file ToolDef with 10MB limit, whitelisted only to Result/ directory",
+      "tags": ["tool-factory", "file-write"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:create_save_memory_tool",
+      "type": "function",
+      "name": "create_save_memory_tool",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Creates save_memory ToolDef for LLM to persist information to long-term memory (append/overwrite)",
+      "tags": ["tool-factory", "memory"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:create_read_memory_tool",
+      "type": "function",
+      "name": "create_read_memory_tool",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Creates read_memory ToolDef for LLM to retrieve stored long-term memory",
+      "tags": ["tool-factory", "memory"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:create_rag_query_tool",
+      "type": "function",
+      "name": "create_rag_query_tool",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Creates rag_query ToolDef: intercepts Skill-level RAG calls, delegates to KnowledgeBase.query() for semantic retrieval, returns JSON results",
+      "tags": ["tool-factory", "rag", "knowledge-base"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/builtin_tools.py:create_todo_tool",
+      "type": "function",
+      "name": "create_todo_tool",
+      "filePath": "Code/DataCode/builtin_tools.py",
+      "summary": "Creates todo ToolDef: manages multi-step task progress via todo_manager, logs updates",
+      "tags": ["tool-factory", "todo", "task-management"],
+      "complexity": "low"
+    },
+
+    {
+      "id": "class:Code/DataCode/tool_registry.py:ToolDef",
+      "type": "class",
+      "name": "ToolDef",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Dataclass defining a tool: name, description, JSON parameters schema, source (builtin/platform/skill/mcp), and optional async/sync handler with to_langchain_tool() adapter",
+      "tags": ["dataclass", "tool-definition", "langchain-adapter"],
+      "complexity": "low"
+    },
+    {
+      "id": "class:Code/DataCode/tool_registry.py:ToolRegistry",
+      "type": "class",
+      "name": "ToolRegistry",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Central tool registry: register/unregister/get/list_all/search tools by name/description with case-insensitive matching",
+      "tags": ["registry", "tool-search"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:_json_type_to_python",
+      "type": "function",
+      "name": "_json_type_to_python",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Maps JSON schema types (string/integer/number/boolean/array/object) to Python types",
+      "tags": ["json-schema", "type-mapping"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:_json_schema_to_pydantic",
+      "type": "function",
+      "name": "_json_schema_to_pydantic",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Converts JSON schema to a Pydantic model using create_model() for LangChain StructuredTool validation",
+      "tags": ["json-schema", "pydantic", "validation"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:create_tool_search_tool",
+      "type": "function",
+      "name": "create_tool_search_tool",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Creates ToolSearch meta-tool: enables Agent to discover available tools by keyword search or list all",
+      "tags": ["meta-tool", "tool-search"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:create_skill_search_tool",
+      "type": "function",
+      "name": "create_skill_search_tool",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Creates SkillSearch meta-tool: enables Agent to discover registered skills (source=skill) by keyword or list all",
+      "tags": ["meta-tool", "skill-search"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:ToolDef.to_langchain_tool",
+      "type": "function",
+      "name": "to_langchain_tool",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Converts ToolDef to LangChain StructuredTool with Pydantic args schema; preserves async handler for LangGraph compatibility",
+      "tags": ["langchain", "adapter", "structured-tool"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:ToolRegistry.register",
+      "type": "function",
+      "name": "register",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Registers a tool by name, warns on overwrite",
+      "tags": ["registry"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:ToolRegistry.unregister",
+      "type": "function",
+      "name": "unregister",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Removes a tool by name from registry",
+      "tags": ["registry"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:ToolRegistry.get",
+      "type": "function",
+      "name": "get",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Looks up a ToolDef by name, returns None if not found",
+      "tags": ["registry", "lookup"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:ToolRegistry.list_all",
+      "type": "function",
+      "name": "list_all",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Returns all registered ToolDef instances as a list",
+      "tags": ["registry"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/tool_registry.py:ToolRegistry.search",
+      "type": "function",
+      "name": "search",
+      "filePath": "Code/DataCode/tool_registry.py",
+      "summary": "Case-insensitive search across tool name and description",
+      "tags": ["registry", "search"],
+      "complexity": "low"
+    },
+
+    {
+      "id": "class:Code/DataCode/execute_tool.py:ExecuteTool",
+      "type": "class",
+      "name": "ExecuteTool",
+      "filePath": "Code/DataCode/execute_tool.py",
+      "summary": "Unified tool execution flyweight: validates tool name against permission whitelist, looks up in registry, logs call/result, executes handler with sync/async dual-path, injects todo nag reminders",
+      "tags": ["tool-execution", "permission", "flyweight", "logging", "nag"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/execute_tool.py:ExecuteTool._execute",
+      "type": "function",
+      "name": "_execute",
+      "filePath": "Code/DataCode/execute_tool.py",
+      "summary": "Shared execution pipeline: permission check -> registry lookup -> call log -> execute handler -> result log -> todo nag injection; handles both sync and async handlers",
+      "tags": ["execution-pipeline", "permission", "logging"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/execute_tool.py:ExecuteTool.run_async",
+      "type": "function",
+      "name": "run_async",
+      "filePath": "Code/DataCode/execute_tool.py",
+      "summary": "Async execution entry point, delegates to _execute",
+      "tags": ["async", "execution"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/execute_tool.py:ExecuteTool.run",
+      "type": "function",
+      "name": "run",
+      "filePath": "Code/DataCode/execute_tool.py",
+      "summary": "Sync execution with dual-mode: uses run_coroutine_threadsafe if in running event loop, otherwise asyncio.run()",
+      "tags": ["sync", "execution", "event-loop"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/execute_tool.py:ExecuteTool.as_tool",
+      "type": "function",
+      "name": "as_tool",
+      "filePath": "Code/DataCode/execute_tool.py",
+      "summary": "Returns self as a ToolDef with async handler wrapping run_async, exposing ExecuteTool as a LangChain-compatible tool",
+      "tags": ["adapter", "langchain"],
+      "complexity": "low"
+    },
+
+    {
+      "id": "function:Code/DataCode/deep_agent.py:build_ssl_context",
+      "type": "function",
+      "name": "build_ssl_context",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Builds SSL context with lowered SECLEVEL for OpenSSL 3.0 TLS handshake compatibility, TLS 1.2 minimum",
+      "tags": ["ssl", "tls", "security"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:llm_trust_env_proxy",
+      "type": "function",
+      "name": "llm_trust_env_proxy",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Checks MEDAGENT_LLM_TRUST_ENV_PROXY env var to determine if LLM HTTP client should honor system proxy",
+      "tags": ["proxy", "env-var"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:llm_timeout_seconds",
+      "type": "function",
+      "name": "llm_timeout_seconds",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Reads MEDAGENT_LLM_HTTP_TIMEOUT env var for LLM HTTP timeout, defaults to 120s, minimum 10s",
+      "tags": ["timeout", "env-var"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:make_sync_llm_http_client",
+      "type": "function",
+      "name": "make_sync_llm_http_client",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Creates httpx.Client with configured timeout and proxy trust",
+      "tags": ["http-client", "httpx"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:make_async_llm_http_client",
+      "type": "function",
+      "name": "make_async_llm_http_client",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Creates httpx.AsyncClient with configured timeout and proxy trust",
+      "tags": ["http-client", "httpx", "async"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:create_deep_agent",
+      "type": "function",
+      "name": "create_deep_agent",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Factory for LangGraph ReAct agents: creates ChatOpenAI LLM (or accepts shared instance), configures parallel/serial tool calls via bind_tools wrapper pattern, selects autonomous (create_react_agent) or sequential (_SequentialAgent) mode",
+      "tags": ["agent-factory", "re-act", "langgraph", "parallel-tools", "llm-share"],
+      "complexity": "high"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:build_tools_from_registry",
+      "type": "function",
+      "name": "build_tools_from_registry",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Builds a list of LangChain tools from ToolRegistry, optionally filtered by allowed_tools list",
+      "tags": ["tool-building", "registry"],
+      "complexity": "low"
+    },
+    {
+      "id": "class:Code/DataCode/deep_agent.py:_SequentialAgent",
+      "type": "class",
+      "name": "_SequentialAgent",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Sequential step-chain agent: splits system prompt by numbered steps, executes each as separate LLM call with accumulated context, supports invoke/ainvoke/astream_events",
+      "tags": ["sequential-agent", "step-chain", "fallback-agent"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:_SequentialAgent.invoke",
+      "type": "function",
+      "name": "invoke",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Synchronous step-chain execution: splits steps, iterates with accumulated context, returns all messages",
+      "tags": ["execution", "sync"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:_SequentialAgent.ainvoke",
+      "type": "function",
+      "name": "ainvoke",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Asynchronous step-chain execution",
+      "tags": ["execution", "async"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:_SequentialAgent.astream_events",
+      "type": "function",
+      "name": "astream_events",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Simplified streaming for sequential mode: yields final AI message as streaming event",
+      "tags": ["streaming", "sequential"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/deep_agent.py:_SequentialAgent._split_steps",
+      "type": "function",
+      "name": "_split_steps",
+      "filePath": "Code/DataCode/deep_agent.py",
+      "summary": "Splits text by numbered steps (1. xxx 2. xxx ...), returns list of step bodies without numbering",
+      "tags": ["splitting", "steps"],
+      "complexity": "low"
+    },
+
+    {
+      "id": "function:Code/DataCode/llm_callback.py:_sanitize",
+      "type": "function",
+      "name": "_sanitize",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Redacts API keys matching sk- pattern from text for safe logging",
+      "tags": ["sanitization", "security", "logging"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:_short",
+      "type": "function",
+      "name": "_short",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Truncates text to limit chars with overflow count, sanitizes API keys",
+      "tags": ["truncation", "formatting"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:_key_tail",
+      "type": "function",
+      "name": "_key_tail",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Returns masked API key showing only last 4 characters",
+      "tags": ["security", "formatting"],
+      "complexity": "low"
+    },
+    {
+      "id": "class:Code/DataCode/llm_callback.py:LLMCallTracker",
+      "type": "class",
+      "name": "LLMCallTracker",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Global singleton LLM call tracker: records all LLM invocations (start/succeed/fail) in a thread-safe ring buffer with key sanitization, used for /api/debug/llm endpoint",
+      "tags": ["singleton", "tracker", "ring-buffer", "thread-safe", "debug"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallTracker.instance",
+      "type": "function",
+      "name": "instance",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Returns the singleton LLMCallTracker instance, creates if needed",
+      "tags": ["singleton"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallTracker.start",
+      "type": "function",
+      "name": "start",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Records the start of an LLM call: agent, model, base_url, key tail, prompt stats, returns call_id",
+      "tags": ["tracking"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallTracker.succeed",
+      "type": "function",
+      "name": "succeed",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Marks an LLM call as successful with response stats and latency",
+      "tags": ["tracking"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallTracker.fail",
+      "type": "function",
+      "name": "fail",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Marks an LLM call as failed with error type and sanitized message",
+      "tags": ["tracking", "error"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallTracker.recent",
+      "type": "function",
+      "name": "recent",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Returns most recent N records in reverse chronological order",
+      "tags": ["query", "debug"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallTracker.clear",
+      "type": "function",
+      "name": "clear",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "Clears all records and inflight calls",
+      "tags": ["reset"],
+      "complexity": "low"
+    },
+    {
+      "id": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler",
+      "type": "class",
+      "name": "LLMCallbackHandler",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "LangChain BaseCallbackHandler: automatically records ChatOpenAI invocations (chat_model_start/llm_start/llm_end/llm_error) by mapping LangGraph run_ids to LLMCallTracker call_ids",
+      "tags": ["callback-handler", "langchain", "automatic-tracking"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_chat_model_start",
+      "type": "function",
+      "name": "on_chat_model_start",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "LangChain callback: triggers on chat model start, extracts prompt from messages, starts tracking",
+      "tags": ["callback", "tracking"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_start",
+      "type": "function",
+      "name": "on_llm_start",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "LangChain callback: triggers on completion model start",
+      "tags": ["callback", "tracking"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_end",
+      "type": "function",
+      "name": "on_llm_end",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "LangChain callback: extracts generation text, marks call as successful",
+      "tags": ["callback", "tracking"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_error",
+      "type": "function",
+      "name": "on_llm_error",
+      "filePath": "Code/DataCode/llm_callback.py",
+      "summary": "LangChain callback: marks call as failed with error details",
+      "tags": ["callback", "tracking", "error"],
+      "complexity": "low"
+    },
+
+    {
+      "id": "class:Code/DataCode/config_manager.py:AgentConfig",
+      "type": "class",
+      "name": "AgentConfig",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Dataclass for agent configuration: name, system_prompt, available_tools/skills lists, optional model override",
+      "tags": ["dataclass", "agent-config"],
+      "complexity": "low"
+    },
+    {
+      "id": "class:Code/DataCode/config_manager.py:ConfigManager",
+      "type": "class",
+      "name": "ConfigManager",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Hierarchical YAML config manager: loads platform.yaml and per-agent configs from directory structure (system_prompt.txt, available_tools.txt, LLM_model.txt), supports env var overrides for API keys, dot-notation key access, validation, and watchdog-based file-change auto-reload",
+      "tags": ["config-manager", "yaml", "hierarchical", "auto-reload", "watchdog", "agent-config"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager.load",
+      "type": "function",
+      "name": "load",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Loads platform config then agent configs",
+      "tags": ["loading"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager._load_platform",
+      "type": "function",
+      "name": "_load_platform",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Loads platform.yaml, applies environment variable override for LLM_API_KEY",
+      "tags": ["yaml", "env-override"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager._load_agents",
+      "type": "function",
+      "name": "_load_agents",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Loads main agent from agents/main/ directory, then discovers sub-agents via atomic reference swap",
+      "tags": ["agent-discovery", "atomic-swap"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager._load_sub_agents_into",
+      "type": "function",
+      "name": "_load_sub_agents_into",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Discovers sub-agents from agents/sub/ directory, inheriting parent configs",
+      "tags": ["sub-agent-discovery"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager._load_agent_dir",
+      "type": "function",
+      "name": "_load_agent_dir",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Loads a single agent config from directory: reads system_prompt.txt, available_tools/skills.txt, LLM_model.txt, inherits from parent if specified",
+      "tags": ["agent-config", "file-reading"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager._load_list_file",
+      "type": "function",
+      "name": "_load_list_file",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Reads a text file line by line, returns non-empty stripped lines as list",
+      "tags": ["utility", "file-reading"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager.get",
+      "type": "function",
+      "name": "get",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Dot-notation config access: 'llm.base_url' -> navigates nested platform dict, returns default on miss",
+      "tags": ["config-access"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager.get_agent_config",
+      "type": "function",
+      "name": "get_agent_config",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Returns AgentConfig by name, or None",
+      "tags": ["config-access"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager.list_agents",
+      "type": "function",
+      "name": "list_agents",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Returns all registered agent names",
+      "tags": ["query"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager.validate",
+      "type": "function",
+      "name": "validate",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Validates required config fields: llm.base_url, llm.api_key, llm.default_model, main agent config",
+      "tags": ["validation"],
+      "complexity": "low"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager.watch",
+      "type": "function",
+      "name": "watch",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Starts watchdog file-system observer on agents_dir and platform.yaml parent; debounces 500ms before calling reload callback",
+      "tags": ["file-watch", "auto-reload", "watchdog"],
+      "complexity": "medium"
+    },
+    {
+      "id": "function:Code/DataCode/config_manager.py:ConfigManager.stop_watch",
+      "type": "function",
+      "name": "stop_watch",
+      "filePath": "Code/DataCode/config_manager.py",
+      "summary": "Stops watchdog observer with 2s join timeout",
+      "tags": ["file-watch", "cleanup"],
+      "complexity": "low"
+    }
+  ],
+
+  "edges": [
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "file:Code/DataCode/deep_agent.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "file:Code/DataCode/llm_callback.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "file:Code/DataCode/tool_registry.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "file:Code/DataCode/execute_tool.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "file:Code/DataCode/llm_callback.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "file:Code/DataCode/deep_agent.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "file:Code/DataCode/agent_manager.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "file:Code/DataCode/tool_registry.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/execute_tool.py", "target": "file:Code/DataCode/tool_registry.py", "type": "imports", "weight": 0.7},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "file:Code/DataCode/llm_callback.py", "type": "imports", "weight": 0.7},
+
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "class:Code/DataCode/agent_manager.py:AgentManager", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "function:Code/DataCode/agent_manager.py:_build_file_index", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "function:Code/DataCode/agent_manager.py:_truncate_files_text", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "function:Code/DataCode/agent_manager.py:_truncate_prior_reports", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "function:Code/DataCode/agent_manager.py:resolve_sub_skill_path", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/agent_manager.py", "target": "function:Code/DataCode/agent_manager.py:_get_sub_agent_recursion_limit", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.__init__", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager._get_or_create_llm", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.start_main_agent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.discover_sub_agents", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_agent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.schedule_sub_agents", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agents_parallel", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.destroy_agent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.list_agents", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.get_agent_status", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.get_agent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager.route_message", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager._run_knowledge_retrieval_direct", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_tool", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/agent_manager.py:AgentManager", "target": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_parallel_tool", "type": "contains", "weight": 1.0},
+
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.start_main_agent", "target": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.start_main_agent", "target": "function:Code/DataCode/deep_agent.py:create_deep_agent", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.discover_sub_agents", "target": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.discover_sub_agents", "target": "function:Code/DataCode/deep_agent.py:create_deep_agent", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "function:Code/DataCode/agent_manager.py:AgentManager._get_or_create_llm", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "function:Code/DataCode/deep_agent.py:create_deep_agent", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "function:Code/DataCode/agent_manager.py:_truncate_files_text", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "function:Code/DataCode/agent_manager.py:_build_file_index", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "function:Code/DataCode/agent_manager.py:_truncate_prior_reports", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "target": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "target": "function:Code/DataCode/agent_manager.py:AgentManager._get_or_create_llm", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "target": "function:Code/DataCode/deep_agent.py:create_deep_agent", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "target": "function:Code/DataCode/agent_manager.py:_get_sub_agent_recursion_limit", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agents_parallel", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_tool", "target": "function:Code/DataCode/agent_manager.py:resolve_sub_skill_path", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_tool", "target": "function:Code/DataCode/agent_manager.py:AgentManager._run_knowledge_retrieval_direct", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_tool", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_parallel_tool", "target": "function:Code/DataCode/agent_manager.py:resolve_sub_skill_path", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_parallel_tool", "target": "function:Code/DataCode/agent_manager.py:AgentManager.spawn_sub_agent_isolated", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._run_knowledge_retrieval_direct", "target": "class:Code/DataCode/tool_registry.py:ToolRegistry", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools", "target": "class:Code/DataCode/execute_tool.py:ExecuteTool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools", "target": "function:Code/DataCode/tool_registry.py:create_tool_search_tool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools", "target": "function:Code/DataCode/tool_registry.py:create_skill_search_tool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "target": "function:Code/DataCode/tool_registry.py:create_tool_search_tool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "target": "function:Code/DataCode/tool_registry.py:create_skill_search_tool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "target": "class:Code/DataCode/execute_tool.py:ExecuteTool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "target": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_tool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._assemble_tools_for_skill", "target": "function:Code/DataCode/agent_manager.py:AgentManager._create_sessions_spawn_parallel_tool", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._get_or_create_llm", "target": "function:Code/DataCode/deep_agent.py:make_sync_llm_http_client", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/agent_manager.py:AgentManager._get_or_create_llm", "target": "function:Code/DataCode/deep_agent.py:make_async_llm_http_client", "type": "calls", "weight": 0.8},
+
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "class:Code/DataCode/skill_executor.py:PipelineStep", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "class:Code/DataCode/skill_executor.py:SkillExecutor", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:load_pipeline_config", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:_load_step_schema", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:_score_result_for_step", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:_build_previous_summary", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:_file_category_summary", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:_first_content_snippet", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:_format_files_for_prompt", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/skill_executor.py", "target": "function:Code/DataCode/skill_executor.py:_has_loaded_ocr_content", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor.__init__", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor.load_skills", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor.load_pipeline", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._format_knowledge", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._apply_llm_candidate", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._candidate_names", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._is_step_specific_error", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._classify_llm_error", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_system_prompt", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_json", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._is_invalid_agent_output", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._json_to_markdown", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._clean_agent_content", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_structured_from_markdown", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor.reset_disabled_providers", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor.llm_status", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_with_llm_candidates", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_via_agent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_chat", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._chunked", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_prompt", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_fallback", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._stream_main_llm", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._write_generated_report_context", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/skill_executor.py:SkillExecutor", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._background_clean_cache", "type": "contains", "weight": 1.0},
+
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_with_llm_candidates", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_via_agent", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_with_llm_candidates", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._apply_llm_candidate", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_with_llm_candidates", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._classify_llm_error", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_with_llm_candidates", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._candidate_names", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_via_agent", "target": "function:Code/DataCode/agent_manager.py:AgentManager.run_skill", "type": "calls", "weight": 0.9},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_via_agent", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._is_invalid_agent_output", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_via_agent", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_json", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_via_agent", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_chat", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_prompt", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_chat", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_fallback", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_chat", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._chunked", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_chat", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._stream_main_llm", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._stream_main_llm", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._stream_main_llm", "target": "function:Code/DataCode/deep_agent.py:make_async_llm_http_client", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:_has_loaded_ocr_content", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._format_knowledge", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:_score_result_for_step", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:_build_previous_summary", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:_format_files_for_prompt", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._run_skill_with_llm_candidates", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._json_to_markdown", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._clean_agent_content", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._is_step_specific_error", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._classify_llm_error", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._write_generated_report_context", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._background_clean_cache", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.execute_report_skills", "target": "function:Code/DataCode/skill_executor.py:_file_category_summary", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_prompt", "target": "function:Code/DataCode/skill_executor.py:_file_category_summary", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_prompt", "target": "function:Code/DataCode/skill_executor.py:_format_files_for_prompt", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_fallback", "target": "function:Code/DataCode/skill_executor.py:_file_category_summary", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._build_chat_fallback", "target": "function:Code/DataCode/skill_executor.py:_format_files_for_prompt", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor._extract_structured_from_markdown", "target": "function:Code/DataCode/skill_executor.py:SkillExecutor._clean_agent_content", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/skill_executor.py:SkillExecutor.load_pipeline", "target": "function:Code/DataCode/skill_executor.py:load_pipeline_config", "type": "calls", "weight": 0.8},
+
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:_resolve_and_check", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:create_read_file_tool", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:create_batch_pdf_conversion_tool", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:_convert_via_pypdf2", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:create_write_file_tool", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:create_save_memory_tool", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:create_read_memory_tool", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:create_rag_query_tool", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/builtin_tools.py", "target": "function:Code/DataCode/builtin_tools.py:create_todo_tool", "type": "contains", "weight": 1.0},
+    {"source": "function:Code/DataCode/builtin_tools.py:create_read_file_tool", "target": "function:Code/DataCode/builtin_tools.py:_resolve_and_check", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/builtin_tools.py:create_write_file_tool", "target": "function:Code/DataCode/builtin_tools.py:_resolve_and_check", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/builtin_tools.py:create_batch_pdf_conversion_tool", "target": "function:Code/DataCode/builtin_tools.py:_convert_via_pypdf2", "type": "calls", "weight": 0.8},
+
+    {"source": "file:Code/DataCode/tool_registry.py", "target": "class:Code/DataCode/tool_registry.py:ToolDef", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/tool_registry.py", "target": "class:Code/DataCode/tool_registry.py:ToolRegistry", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/tool_registry.py", "target": "function:Code/DataCode/tool_registry.py:_json_type_to_python", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/tool_registry.py", "target": "function:Code/DataCode/tool_registry.py:_json_schema_to_pydantic", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/tool_registry.py", "target": "function:Code/DataCode/tool_registry.py:create_tool_search_tool", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/tool_registry.py", "target": "function:Code/DataCode/tool_registry.py:create_skill_search_tool", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/tool_registry.py:ToolDef", "target": "function:Code/DataCode/tool_registry.py:ToolDef.to_langchain_tool", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/tool_registry.py:ToolRegistry", "target": "function:Code/DataCode/tool_registry.py:ToolRegistry.register", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/tool_registry.py:ToolRegistry", "target": "function:Code/DataCode/tool_registry.py:ToolRegistry.unregister", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/tool_registry.py:ToolRegistry", "target": "function:Code/DataCode/tool_registry.py:ToolRegistry.get", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/tool_registry.py:ToolRegistry", "target": "function:Code/DataCode/tool_registry.py:ToolRegistry.list_all", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/tool_registry.py:ToolRegistry", "target": "function:Code/DataCode/tool_registry.py:ToolRegistry.search", "type": "contains", "weight": 1.0},
+    {"source": "function:Code/DataCode/tool_registry.py:ToolDef.to_langchain_tool", "target": "function:Code/DataCode/tool_registry.py:_json_schema_to_pydantic", "type": "calls", "weight": 0.8},
+
+    {"source": "file:Code/DataCode/execute_tool.py", "target": "class:Code/DataCode/execute_tool.py:ExecuteTool", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/execute_tool.py:ExecuteTool", "target": "function:Code/DataCode/execute_tool.py:ExecuteTool._execute", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/execute_tool.py:ExecuteTool", "target": "function:Code/DataCode/execute_tool.py:ExecuteTool.run_async", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/execute_tool.py:ExecuteTool", "target": "function:Code/DataCode/execute_tool.py:ExecuteTool.run", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/execute_tool.py:ExecuteTool", "target": "function:Code/DataCode/execute_tool.py:ExecuteTool.as_tool", "type": "contains", "weight": 1.0},
+    {"source": "function:Code/DataCode/execute_tool.py:ExecuteTool.run_async", "target": "function:Code/DataCode/execute_tool.py:ExecuteTool._execute", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/execute_tool.py:ExecuteTool.run", "target": "function:Code/DataCode/execute_tool.py:ExecuteTool._execute", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/execute_tool.py:ExecuteTool.as_tool", "target": "function:Code/DataCode/execute_tool.py:ExecuteTool.run_async", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/execute_tool.py:ExecuteTool._execute", "target": "class:Code/DataCode/tool_registry.py:ToolRegistry", "type": "calls", "weight": 0.8},
+
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "function:Code/DataCode/deep_agent.py:build_ssl_context", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "function:Code/DataCode/deep_agent.py:llm_trust_env_proxy", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "function:Code/DataCode/deep_agent.py:llm_timeout_seconds", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "function:Code/DataCode/deep_agent.py:make_sync_llm_http_client", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "function:Code/DataCode/deep_agent.py:make_async_llm_http_client", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "function:Code/DataCode/deep_agent.py:create_deep_agent", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "function:Code/DataCode/deep_agent.py:build_tools_from_registry", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/deep_agent.py", "target": "class:Code/DataCode/deep_agent.py:_SequentialAgent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/deep_agent.py:_SequentialAgent", "target": "function:Code/DataCode/deep_agent.py:_SequentialAgent.invoke", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/deep_agent.py:_SequentialAgent", "target": "function:Code/DataCode/deep_agent.py:_SequentialAgent.ainvoke", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/deep_agent.py:_SequentialAgent", "target": "function:Code/DataCode/deep_agent.py:_SequentialAgent.astream_events", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/deep_agent.py:_SequentialAgent", "target": "function:Code/DataCode/deep_agent.py:_SequentialAgent._split_steps", "type": "contains", "weight": 1.0},
+    {"source": "function:Code/DataCode/deep_agent.py:create_deep_agent", "target": "function:Code/DataCode/deep_agent.py:make_sync_llm_http_client", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/deep_agent.py:create_deep_agent", "target": "function:Code/DataCode/deep_agent.py:make_async_llm_http_client", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/deep_agent.py:create_deep_agent", "target": "class:Code/DataCode/deep_agent.py:_SequentialAgent", "type": "calls", "weight": 0.8},
+
+    {"source": "file:Code/DataCode/llm_callback.py", "target": "function:Code/DataCode/llm_callback.py:_sanitize", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/llm_callback.py", "target": "function:Code/DataCode/llm_callback.py:_short", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/llm_callback.py", "target": "function:Code/DataCode/llm_callback.py:_key_tail", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/llm_callback.py", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/llm_callback.py", "target": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "target": "function:Code/DataCode/llm_callback.py:LLMCallTracker.instance", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "target": "function:Code/DataCode/llm_callback.py:LLMCallTracker.start", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "target": "function:Code/DataCode/llm_callback.py:LLMCallTracker.succeed", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "target": "function:Code/DataCode/llm_callback.py:LLMCallTracker.fail", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "target": "function:Code/DataCode/llm_callback.py:LLMCallTracker.recent", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "target": "function:Code/DataCode/llm_callback.py:LLMCallTracker.clear", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "target": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_chat_model_start", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "target": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_start", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "target": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_end", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "target": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_error", "type": "contains", "weight": 1.0},
+    {"source": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_chat_model_start", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_start", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_end", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/llm_callback.py:LLMCallbackHandler.on_llm_error", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "calls", "weight": 0.8},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "calls", "weight": 0.8},
+
+    {"source": "file:Code/DataCode/config_manager.py", "target": "class:Code/DataCode/config_manager.py:AgentConfig", "type": "contains", "weight": 1.0},
+    {"source": "file:Code/DataCode/config_manager.py", "target": "class:Code/DataCode/config_manager.py:ConfigManager", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager.load", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_platform", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_agents", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_sub_agents_into", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_agent_dir", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_list_file", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager.get", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager.get_agent_config", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager.list_agents", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager.validate", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager.watch", "type": "contains", "weight": 1.0},
+    {"source": "class:Code/DataCode/config_manager.py:ConfigManager", "target": "function:Code/DataCode/config_manager.py:ConfigManager.stop_watch", "type": "contains", "weight": 1.0},
+    {"source": "function:Code/DataCode/config_manager.py:ConfigManager.load", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_platform", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/config_manager.py:ConfigManager.load", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_agents", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/config_manager.py:ConfigManager._load_agents", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_sub_agents_into", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/config_manager.py:ConfigManager._load_agents", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_agent_dir", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/config_manager.py:ConfigManager._load_sub_agents_into", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_agent_dir", "type": "calls", "weight": 0.8},
+    {"source": "function:Code/DataCode/config_manager.py:ConfigManager._load_agent_dir", "target": "function:Code/DataCode/config_manager.py:ConfigManager._load_list_file", "type": "calls", "weight": 0.8},
+
+    {"source": "class:Code/DataCode/tool_registry.py:ToolDef", "target": "class:Code/DataCode/execute_tool.py:ExecuteTool", "type": "uses", "weight": 0.6},
+    {"source": "class:Code/DataCode/tool_registry.py:ToolRegistry", "target": "class:Code/DataCode/agent_manager.py:AgentManager", "type": "uses", "weight": 0.6},
+    {"source": "class:Code/DataCode/llm_callback.py:LLMCallbackHandler", "target": "class:Code/DataCode/llm_callback.py:LLMCallTracker", "type": "uses", "weight": 0.6}
+  ]
+}

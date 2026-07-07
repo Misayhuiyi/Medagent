@@ -7,7 +7,7 @@
 
 encounter 参数（可选）：
   - null / 不传：使用全部患者文件（当前行为）
-  - {admission, discharge}：只使用该次就诊时间范围内的文件
+  - {admission, discharge, type, source_admission}：按该时间点读取累计资料并注入上一期报告
 """
 
 from __future__ import annotations
@@ -30,6 +30,16 @@ _REPORT_KEYWORDS = (
     "生成报告", "完整报告", "门诊报告", "更新右侧", "更新报告",
     "五个页签", "5个页签", "右侧报告", "结构化报告",
 )
+_HISTORY_REPORT_NOISE_KEYWORDS = (
+    *_REPORT_KEYWORDS,
+    "报告已生成",
+    "已完成生成报告",
+    "已完成患者病史总结",
+    "已完成患者概况",
+    "已完成治疗方案",
+    "已完成疗效预测",
+    "已完成其他建议",
+)
 
 _DATE_RANGE_RE = _re.compile(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})')
 
@@ -37,6 +47,9 @@ _DATE_RANGE_RE = _re.compile(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})')
 class EncounterFilter(BaseModel):
     admission: str = ""
     discharge: str = ""
+    type: str = ""
+    label: str = ""
+    source_admission: str = ""
 
 
 class MessageRequest(BaseModel):
@@ -140,6 +153,63 @@ def _filter_files_by_encounter(
     return filtered
 
 
+def _load_files_for_request(patient_id: str, encounter: EncounterFilter | None, mode: str) -> tuple[list[dict], str, str]:
+    """Load raw evidence for chat/report while keeping longitudinal report stages continuous."""
+    from DataCode.report_context import detect_patient_encounters, load_cumulative_patient_files
+
+    pdir = _patient_dir(patient_id)
+    has_selected_encounter = bool(encounter and encounter.admission)
+    visit_date = _resolve_visit_date(pdir, encounter)
+    encounter_type = _resolve_encounter_type(pdir, encounter, visit_date)
+    if mode == "report" and not has_selected_encounter:
+        files = load_cumulative_patient_files(pdir, visit_date="")
+        return files, visit_date, "all"
+    if mode == "report" and visit_date:
+        return load_cumulative_patient_files(pdir, visit_date=visit_date), visit_date, encounter_type
+    if encounter and visit_date:
+        return load_cumulative_patient_files(pdir, visit_date=visit_date), visit_date, encounter_type
+
+    files = _load_patient_files(patient_id)
+    if not visit_date:
+        encounters = detect_patient_encounters(pdir)
+        visit_date = str(encounters[-1].get("admission", "")) if encounters else _extract_visit_date(files)
+        encounter_type = str(encounters[-1].get("type", "")) if encounters else "all"
+    return files, visit_date, encounter_type or "all"
+
+
+def _resolve_visit_date(pdir: Path, encounter: EncounterFilter | None) -> str:
+    from DataCode.report_context import detect_patient_encounters
+
+    if encounter and _is_valid_date(encounter.admission):
+        if encounter.type == "discharge" and _is_valid_date(encounter.source_admission):
+            return encounter.source_admission
+        return encounter.admission
+    encounters = detect_patient_encounters(pdir)
+    if encounters:
+        selected = next((item for item in reversed(encounters) if item.get("type") != "discharge"), encounters[-1])
+        return str(selected.get("admission", ""))
+    return ""
+
+
+def _resolve_encounter_type(pdir: Path, encounter: EncounterFilter | None, visit_date: str) -> str:
+    if encounter and encounter.type:
+        return encounter.type
+    try:
+        from DataCode.report_context import detect_patient_encounters
+
+        matched = next((item for item in detect_patient_encounters(pdir) if item.get("admission") == visit_date), None)
+        return str((matched or {}).get("type") or "selected")
+    except Exception:
+        return "selected"
+
+
+def _is_valid_date(value: str) -> bool:
+    try:
+        return bool(value and len(value) == 10 and datetime.strptime(value, "%Y-%m-%d"))
+    except ValueError:
+        return False
+
+
 def _format_sse(event: dict) -> str:
     """将事件 dict 格式化为 SSE 文本块。"""
     lines = [f"id: {event['id']}", f"event: {event['event']}"]
@@ -161,7 +231,27 @@ def _save_chat_message(patient_id: str, role: str, content: str):
         "content": content,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
     })
+    history = _clean_chat_history(history)
     history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _save_report_task_message(patient_id: str, role: str, content: str):
+    """Keep report-generation chatter out of the clinical chat history."""
+    mem_dir = _memory_dir(patient_id)
+    mem_dir.mkdir(parents=True, exist_ok=True)
+    path = mem_dir / "report_history.json"
+    try:
+        history = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    except (json.JSONDecodeError, OSError):
+        history = []
+    history.append({
+        "role": role,
+        "content": content,
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+    })
+    if len(history) > 80:
+        history = history[-80:]
+    path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _resolve_mode(message: str, requested: str) -> str:
@@ -178,9 +268,47 @@ def _load_history(patient_id: str) -> list[dict]:
     if not history_path.exists():
         return []
     try:
-        return json.loads(history_path.read_text(encoding="utf-8"))
+        history = json.loads(history_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return []
+    cleaned = _clean_chat_history(history)
+    if cleaned != history:
+        try:
+            backup_path = history_path.with_suffix(".json.bak")
+            if not backup_path.exists():
+                backup_path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+            history_path.write_text(json.dumps(cleaned, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError:
+            logger.exception("Failed to persist cleaned chat history for %s", patient_id)
+    return cleaned
+
+
+def _clean_chat_history(history: list[dict]) -> list[dict]:
+    cleaned: list[dict] = []
+    for entry in history if isinstance(history, list) else []:
+        role = entry.get("role")
+        content = str(entry.get("content", "")).strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        if _is_report_history_noise(content):
+            continue
+        cleaned.append({
+            "role": role,
+            "content": content,
+            "timestamp": entry.get("timestamp") or datetime.now().isoformat(timespec="seconds"),
+        })
+    return cleaned[-80:]
+
+
+def _is_report_history_noise(content: str) -> bool:
+    text = (content or "").strip()
+    if not text:
+        return True
+    if "针对问题「" in text and "建议结合原始数据进一步分析" in text:
+        return True
+    if "资料统计：" in text and "### 文件 " in text and "（其余 " in text:
+        return True
+    return any(keyword in text for keyword in _HISTORY_REPORT_NOISE_KEYWORDS)
 
 
 @router.post("/{patient_id}/messages")
@@ -193,7 +321,10 @@ async def send_message(patient_id: str, body: MessageRequest):
 
     mode = _resolve_mode(body.message, body.mode)
     history_before = _load_history(patient_id)
-    _save_chat_message(patient_id, "user", body.message)
+    if mode == "chat":
+        _save_chat_message(patient_id, "user", body.message)
+    else:
+        _save_report_task_message(patient_id, "user", body.message)
     logger.info(
         "Chat request patient=%s mode=%s requested=%s message_chars=%d",
         patient_id, mode, body.mode, len(body.message or ""),
@@ -208,12 +339,10 @@ async def send_message(patient_id: str, body: MessageRequest):
                 yield _format_sse({"id": 2, "event": "done", "data": {}})
                 return
 
-            files = _load_patient_files(patient_id)
-            # 按就诊时间过滤（encounter 参数）
-            filtered_files = _filter_files_by_encounter(files, body.encounter)
+            files, visit_date, encounter_type = _load_files_for_request(patient_id, body.encounter, mode)
             logger.info(
-                "Chat patient=%s loaded_files=%d filtered_files=%d mode=%s encounter=%s",
-                patient_id, len(files), len(filtered_files), mode,
+                "Chat patient=%s files=%d mode=%s visit_date=%s encounter_type=%s encounter=%s",
+                patient_id, len(files), mode, visit_date, encounter_type,
                 body.encounter.model_dump_json() if body.encounter else "all",
             )
 
@@ -223,7 +352,7 @@ async def send_message(patient_id: str, body: MessageRequest):
                 yield _format_sse({"id": 0, "event": "mode", "data": {"mode": "chat"}})
                 async for event in executor.execute_chat(
                     patient_id=patient_id,
-                    files=filtered_files,
+                    files=files,
                     message=body.message,
                     history=history_before,
                 ):
@@ -231,11 +360,7 @@ async def send_message(patient_id: str, body: MessageRequest):
                         assistant_buffer.append(str(event["data"].get("content", "")))
                     yield _format_sse(event)
             else:
-                # 如果指定了就诊时间，用该时间作为 visit_date
-                visit_date = (
-                    body.encounter.admission if body.encounter and body.encounter.admission
-                    else _extract_visit_date(files)
-                )
+                _clear_report_cache(patient_id, visit_date)
                 prior_reports = ""
                 try:
                     from DataCode.report_context import collect_prior_context_entries, format_prior_context
@@ -254,20 +379,23 @@ async def send_message(patient_id: str, body: MessageRequest):
                 yield _format_sse({"id": 0, "event": "mode", "data": {"mode": "report"}})
                 async for event in executor.execute_report_skills(
                     patient_id=patient_id,
-                    files=filtered_files,
+                    files=files,
                     message=body.message,
                     visit_date=visit_date,
                     prior_reports=prior_reports,
                     patient_dir=str(pdir),
                 ):
                     if event["event"] == "tab_ready":
-                        _save_report_tab(patient_id, event["data"]["tab"], event["data"]["data"])
+                        _save_report_tab(patient_id, event["data"]["tab"], event["data"]["data"], visit_date)
                     if event["event"] == "token":
                         assistant_buffer.append(str(event["data"].get("content", "")))
                     yield _format_sse(event)
 
             if assistant_buffer:
-                _save_chat_message(patient_id, "assistant", "".join(assistant_buffer))
+                if mode == "chat":
+                    _save_chat_message(patient_id, "assistant", "".join(assistant_buffer))
+                else:
+                    _save_report_task_message(patient_id, "assistant", "".join(assistant_buffer))
 
         except Exception as e:
             logger.exception("SSE stream error patient=%s mode=%s", patient_id, mode)
@@ -289,10 +417,18 @@ async def send_message(patient_id: str, body: MessageRequest):
 def _extract_visit_date(files: list[dict]) -> str:
     for f in files:
         name = f["name"]
+        for match in _DATE_RANGE_RE.finditer(name):
+            y, mo, dy = match.group(1), match.group(2).zfill(2), match.group(3).zfill(2)
+            if 2020 <= int(y) <= 2030:
+                return f"{y}-{mo}-{dy}"
         for part in name.replace("_", " ").split():
             if part.isdigit() and len(part) == 8:
                 return f"{part[:4]}-{part[4:6]}-{part[6:8]}"
-    return datetime.now().strftime("%Y-%m")
+    for f in files:
+        dates = _extract_dates(str(f.get("content", "")))
+        if dates:
+            return dates[0]
+    return datetime.now().strftime("%Y-%m-%d")
 
 
 @router.get("/{patient_id}/history")
@@ -303,20 +439,58 @@ async def get_chat_history(patient_id: str):
     if not history_path.exists():
         return []
     try:
-        return json.loads(history_path.read_text(encoding="utf-8"))
+        return _clean_chat_history(json.loads(history_path.read_text(encoding="utf-8")))
     except (json.JSONDecodeError, Exception):
         return []
 
 
-def _save_report_tab(patient_id: str, tab: str, data: dict):
+def _clear_report_cache(patient_id: str, visit_date: str = ""):
+    """Clear stale preview/report cache for a new generation task."""
+    _sanitize_path_segment(patient_id)
+    reports_dir = Path(_get_state("reports_dir")) / patient_id
+    targets = [reports_dir / "report.json"]
+    if _is_valid_date(visit_date):
+        targets.append(reports_dir / visit_date / "report.json")
+    for path in targets:
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError:
+            logger.exception("Failed to clear stale report cache %s", path)
+    try:
+        from DataCode.web_server import _app_state
+
+        cache = _app_state.get("trace_cache", {})
+        for key in list(cache.keys()):
+            if str(key) == patient_id or str(key).startswith(f"{patient_id}:"):
+                cache.pop(key, None)
+    except Exception:
+        logger.exception("Failed to clear trace cache for %s", patient_id)
+
+
+def _save_report_tab(patient_id: str, tab: str, data: dict, visit_date: str = ""):
     """将 tab 数据保存到报告文件。"""
     _sanitize_path_segment(patient_id)
     reports_dir = Path(_get_state("reports_dir")) / patient_id
     reports_dir.mkdir(parents=True, exist_ok=True)
-    report_path = reports_dir / "report.json"
+    report_dir = reports_dir / visit_date if _is_valid_date(visit_date) else reports_dir
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / "report.json"
     if report_path.exists():
         report = json.loads(report_path.read_text(encoding="utf-8"))
     else:
         report = {}
     report[tab] = data
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Keep the legacy latest-report path for the current frontend preview/download flow.
+    latest_path = reports_dir / "report.json"
+    if latest_path != report_path:
+        latest_report = {}
+        if latest_path.exists():
+            try:
+                latest_report = json.loads(latest_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                latest_report = {}
+        latest_report[tab] = data
+        latest_path.write_text(json.dumps(latest_report, ensure_ascii=False, indent=2), encoding="utf-8")

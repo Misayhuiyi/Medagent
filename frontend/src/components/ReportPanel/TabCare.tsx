@@ -1,6 +1,7 @@
 import type { CareData } from '../../types'
 import FigmaReportCard from './FigmaReportCard'
 import { formatClinicalValue } from './textFormat'
+import ClinicalText from './ClinicalText'
 
 const TAB = 'suggestions'
 
@@ -13,7 +14,7 @@ function CareCard({ title, content, evidence }: { title: string; content: unknow
   if (!text) return null
   return (
     <FigmaReportCard title={title} icon="file" evidence={evidence} tab={TAB}>
-      <div className="figma-card__text" style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+      <ClinicalText text={text} />
     </FigmaReportCard>
   )
 }

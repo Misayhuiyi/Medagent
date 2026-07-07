@@ -69,17 +69,23 @@ export async function fetchChatHistory(patientId: string): Promise<ChatMessage[]
 
 // ── 报告 API ──
 
-export async function fetchReport(patientId: string): Promise<ReportData> {
-  const res = await api.get<ReportData>(`/reports/${encodeURIComponent(patientId)}`)
+function withVisitDate(url: string, visitDate?: string): string {
+  if (!visitDate) return url
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}visit_date=${encodeURIComponent(visitDate)}`
+}
+
+export async function fetchReport(patientId: string, visitDate?: string): Promise<ReportData> {
+  const res = await api.get<ReportData>(withVisitDate(`/reports/${encodeURIComponent(patientId)}`, visitDate))
   return res.data
 }
 
-export async function saveReport(patientId: string, report: ReportData): Promise<void> {
-  await api.post(`/reports/${encodeURIComponent(patientId)}`, report)
+export async function saveReport(patientId: string, report: ReportData, visitDate?: string): Promise<void> {
+  await api.post(withVisitDate(`/reports/${encodeURIComponent(patientId)}`, visitDate), report)
 }
 
-export function getDownloadUrl(patientId: string, format: 'md' | 'html' | 'pdf'): string {
-  return `/api/reports/${encodeURIComponent(patientId)}/download?format=${format}`
+export function getDownloadUrl(patientId: string, format: 'md' | 'html' | 'pdf', visitDate?: string): string {
+  return withVisitDate(`/api/reports/${encodeURIComponent(patientId)}/download?format=${format}`, visitDate)
 }
 
 

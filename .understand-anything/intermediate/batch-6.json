@@ -1,0 +1,664 @@
+{
+  "nodes": [
+    {
+      "id": "component-chat-panel",
+      "name": "ChatPanel",
+      "type": "component",
+      "filePath": "frontend/src/components/ChatPanel/index.tsx",
+      "description": "聊天面板主组件，管理对话标签页、就诊时间选择、SSE流式聊天、快捷操作、思考计时器",
+      "props": [],
+      "state": [
+        "selectedId (PatientStore) - 当前选中患者ID",
+        "patients (PatientStore) - 患者列表",
+        "selectedEncounter (PatientStore) - 当前选中就诊",
+        "messages (ChatStore) - 消息列表",
+        "isStreaming (ChatStore) - 是否正在流式响应",
+        "showThinking (useState) - 是否显示思考过程"
+      ],
+      "keyMethods": [
+        "handleSelectEncounter - 切换就诊选择",
+        "handleGenerateReport - 触发报告生成"
+      ]
+    },
+    {
+      "id": "component-chat-input",
+      "name": "ChatInput",
+      "type": "component",
+      "filePath": "frontend/src/components/ChatPanel/ChatInput.tsx",
+      "description": "聊天输入框，支持Enter发送、Shift+Enter换行、textarea自动伸缩",
+      "props": [
+        "onSend: (message: string) => void",
+        "disabled: boolean"
+      ],
+      "state": [
+        "value (useState) - 输入框内容"
+      ],
+      "keyMethods": [
+        "handleSend - 发送消息并清空输入框",
+        "handleKeyDown - Enter发送，Shift+Enter换行",
+        "getTextareaMaxHeight - 读取CSS变量获取最大高度"
+      ]
+    },
+    {
+      "id": "component-message-bubble",
+      "name": "MessageBubble",
+      "type": "component",
+      "filePath": "frontend/src/components/ChatPanel/MessageBubble.tsx",
+      "description": "消息气泡，区分用户/助手/状态三种角色，显示Markdown内容、推理过程和思考时间",
+      "props": [
+        "role: 'user' | 'assistant' | 'status'",
+        "content: string",
+        "reasoning?: string",
+        "showThinking?: boolean"
+      ],
+      "state": [
+        "thinkingTime (ChatStore) - 思考耗时",
+        "isStreaming (ChatStore) - 流式状态"
+      ]
+    },
+    {
+      "id": "component-message-list",
+      "name": "MessageList",
+      "type": "component",
+      "filePath": "frontend/src/components/ChatPanel/MessageList.tsx",
+      "description": "消息列表容器，支持自动滚动到底部和用户滚动锁定",
+      "props": [
+        "messages: ChatMessage[]",
+        "showThinking?: boolean"
+      ],
+      "state": [
+        "userScrolledUp (useRef) - 用户是否手动向上滚动",
+        "isAutoScrolling (useRef) - 是否正在自动滚动"
+      ]
+    },
+    {
+      "id": "component-patient-list",
+      "name": "PatientList",
+      "type": "component",
+      "filePath": "frontend/src/components/PatientList/index.tsx",
+      "description": "患者侧边栏，树形结构展示患者→就诊→报告分类→文件，支持搜索、展开/折叠、文件选中",
+      "props": [],
+      "state": [
+        "patients (PatientStore) - 患者列表",
+        "selectedId (PatientStore) - 选中患者ID",
+        "files (PatientStore) - 当前患者文件列表",
+        "keyword (useState) - 搜索关键词",
+        "expandedPatients/Encounters/Reports (useState) - 树节点展开状态",
+        "selectedFile (useState) - 选中的文件名"
+      ],
+      "keyMethods": [
+        "buildFileTree - 将扁平文件列表构建为多层树结构",
+        "handleSelect - 选中患者并展开",
+        "toggleSet - 通用展开/折叠切换"
+      ]
+    },
+    {
+      "id": "component-add-patient-button",
+      "name": "AddPatientButton",
+      "type": "component",
+      "filePath": "frontend/src/components/PatientList/AddPatientButton.tsx",
+      "description": "添加患者按钮（Demo阶段，仅弹出提示信息）",
+      "props": []
+    },
+    {
+      "id": "component-top-bar",
+      "name": "TopBar",
+      "type": "component",
+      "filePath": "frontend/src/components/TopBar/index.tsx",
+      "description": "顶部品牌栏，显示AI Doctor Logo和'智能体'徽标",
+      "props": []
+    },
+    {
+      "id": "component-markdown-renderer",
+      "name": "MarkdownRenderer",
+      "type": "component",
+      "filePath": "frontend/src/components/common/MarkdownRenderer.tsx",
+      "description": "Markdown渲染组件，支持GFM、LaTeX公式、CSV自动转表格、HTML标签清理",
+      "props": [
+        "content: string"
+      ],
+      "keyMethods": [
+        "preprocess - 预处理Markdown文本",
+        "csvToPipeTables - CSV数据块转Markdown管道表",
+        "sanitizeUrl - 防止XSS的URL净化"
+      ]
+    },
+    {
+      "id": "hook-use-chat",
+      "name": "useChat",
+      "type": "hook",
+      "filePath": "frontend/src/hooks/useChat.ts",
+      "description": "SSE流式聊天Hook，管理AbortController、消息事件处理、报告模式和聊天模式切换",
+      "props": [],
+      "state": [
+        "abortRef (useRef) - AbortController引用",
+        "modeRef (useRef) - 当前模式（chat/report）",
+        "streamSeqRef (useRef) - 流序列号，用于丢弃过期响应"
+      ],
+      "keyMethods": [
+        "sendMessage - 发送消息并建立SSE连接",
+        "generateReport - 发送报告生成请求",
+        "abort - 中断当前请求",
+        "handleEvent - 处理SSE事件分发（status/mode/reasoning/token/tab_ready/tab_content/error/done）",
+        "inferRequestedMode - 根据内容自动推断模式"
+      ],
+      "exposedApi": [
+        "sendMessage(content, mode?, encounter?) -> Promise<void>",
+        "generateReport(content, encounter?) -> Promise<void>",
+        "abort() -> void"
+      ]
+    },
+    {
+      "id": "store-patient",
+      "name": "patientStore",
+      "type": "store",
+      "filePath": "frontend/src/store/patientStore.ts",
+      "description": "患者状态管理（实际位置: store/patientStore.ts），管理患者列表、选中患者、文件列表",
+      "state": [
+        "patients: Patient[]",
+        "selectedId: string | null",
+        "files: PatientFile[]"
+      ],
+      "actions": [
+        "setPatients - 设置患者列表（空列表时清空选中，非空无选中时自动选第一个）",
+        "selectPatient - 选中患者",
+        "removePatient - 移除患者",
+        "setFiles - 设置文件列表"
+      ]
+    },
+    {
+      "id": "store-chat",
+      "name": "chatStore",
+      "type": "store",
+      "filePath": "frontend/src/store/chatStore.ts",
+      "description": "聊天状态管理，维护消息列表、流式状态和Event ID",
+      "state": [
+        "messages: ChatMessage[]",
+        "isStreaming: boolean",
+        "lastEventId: number | undefined",
+        "thinkingTime: number"
+      ],
+      "actions": [
+        "addMessage - 添加单条消息",
+        "addMessages - 批量添加消息",
+        "appendToLastMessage - 追加到最后一条助手消息",
+        "appendReasoning - 追加推理内容",
+        "setStreaming - 设置流式状态",
+        "setLastEventId - 设置最后事件ID",
+        "setThinkingTime - 设置思考计时",
+        "clearMessages - 清空消息并重置状态"
+      ]
+    },
+    {
+      "id": "store-report",
+      "name": "reportStore",
+      "type": "store",
+      "filePath": "frontend/src/store/reportStore.ts",
+      "description": "报告标签页数据管理，维护结构化报告的各标签数据",
+      "state": [
+        "tabs: Record<TabName, any>",
+        "activeTab: TabName"
+      ],
+      "actions": [
+        "setTabData - 设置单个标签页数据",
+        "appendTabContent - 追加标签页内容",
+        "setActiveTab - 切换活动标签",
+        "clearTabs - 清空所有标签页",
+        "setReportData - 一键替换全部报告数据"
+      ]
+    },
+    {
+      "id": "store-edit",
+      "name": "editStore",
+      "type": "store",
+      "filePath": "frontend/src/store/editStore.ts",
+      "description": "报告编辑状态管理，管理编辑模式和表单数据",
+      "state": [
+        "isEditing: boolean",
+        "formData: Record<string, any>"
+      ],
+      "actions": [
+        "startEdit - 进入编辑模式并填充表单",
+        "updateFormField - 更新嵌套表单字段",
+        "cancelEdit - 取消编辑并重置"
+      ]
+    },
+    {
+      "id": "service-api",
+      "name": "api.ts",
+      "type": "service",
+      "filePath": "frontend/src/services/api.ts",
+      "description": "API服务层，封装Axios实例和所有后端接口，包含SSE解析器",
+      "keyMethods": [
+        "fetchPatients - GET /patients",
+        "fetchPatientFiles - GET /patients/:id/files",
+        "fetchFileContent - GET /patients/:id/files/:name",
+        "fetchChatHistory - GET /chat/:id/history",
+        "fetchReport - GET /reports/:id",
+        "saveReport - POST /reports/:id",
+        "getDownloadUrl - 生成报告下载链接",
+        "parseSSE - SSE协议解析（核心函数）"
+      ]
+    },
+    {
+      "id": "service-parse-sse",
+      "name": "parseSSE",
+      "type": "function",
+      "filePath": "frontend/src/services/api.ts",
+      "description": "SSE (Server-Sent Events) 协议解析器，将文本缓冲区解析为SSEEvent数组，支持不完整数据保留",
+      "signature": "(buffer: string) => { remaining: string; events: SSEEvent[] }"
+    },
+    {
+      "id": "type-patient",
+      "name": "Patient",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "患者类型，含基本信息、就诊记录列表",
+      "fields": "id, name, date, discharge_date?, encounters?: PatientEncounter[], file_count, diagnosis?"
+    },
+    {
+      "id": "type-patient-file",
+      "name": "PatientFile",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "患者文件类型，含文件名、大小、类型、修改时间",
+      "fields": "name, size, type, modified_time, has_ocr?"
+    },
+    {
+      "id": "type-chat-message",
+      "name": "ChatMessage",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "聊天消息类型，支持user/assistant/status三种角色",
+      "fields": "role, content, timestamp, reasoning?"
+    },
+    {
+      "id": "type-encounter-filter",
+      "name": "EncounterFilter",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "就诊筛选条件，供ChatPanel和useChat用于限定分析范围",
+      "fields": "admission, discharge, type?, label?, source_admission?"
+    },
+    {
+      "id": "type-sse-event",
+      "name": "SSEEvent",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "SSE事件联合类型，8种事件：status/mode/reasoning/token/tab_ready/tab_content/error/done",
+      "variants": "status, mode, reasoning, token, tab_ready, tab_content, error, done"
+    },
+    {
+      "id": "type-report-data",
+      "name": "ReportData",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "报告数据结构，5个标签页：患者病史/患者概况/治疗方案/疗效预测/其他建议",
+      "fields": "patient-history, patient-overview, treatment-plan, efficacy-prediction, suggestions"
+    },
+    {
+      "id": "type-tab-name",
+      "name": "TabName",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "报告标签页名称联合类型",
+      "values": "'patient-history' | 'patient-overview' | 'treatment-plan' | 'efficacy-prediction' | 'suggestions'"
+    },
+    {
+      "id": "concept-encounter-selector",
+      "name": "EncounterSelector",
+      "type": "concept",
+      "filePath": "frontend/src/components/ChatPanel/index.tsx",
+      "description": "就诊时间选择器（就诊范围Chips），当患者有多次就诊记录时显示，支持'全部就诊'或单次就诊",
+      "lines": "166-202",
+      "relatedTypes": ["EncounterFilter"]
+    },
+    {
+      "id": "concept-conversation-tabs",
+      "name": "ConversationTabs",
+      "type": "concept",
+      "filePath": "frontend/src/components/ChatPanel/index.tsx",
+      "description": "对话标签页栏，在聊天面板头部显示所有已选患者的对话标签，支持切换和关闭",
+      "lines": "128-158"
+    },
+    {
+      "id": "concept-quick-actions-bar",
+      "name": "QuickActionsBar",
+      "type": "concept",
+      "filePath": "frontend/src/components/ChatPanel/index.tsx",
+      "description": "快捷操作栏，包含'文件分析'和'生成报告'两个快捷按钮，流式时禁用",
+      "lines": "204-221"
+    },
+    {
+      "id": "concept-patient-tree",
+      "name": "PatientTree",
+      "type": "concept",
+      "filePath": "frontend/src/components/PatientList/index.tsx",
+      "description": "患者树形结构，4层嵌套：患者→就诊记录→报告分类→文件，支持搜索过滤和展开折叠",
+      "lines": "259-349"
+    },
+    {
+      "id": "concept-file-tree-builder",
+      "name": "FileTreeBuilder",
+      "type": "concept",
+      "filePath": "frontend/src/components/PatientList/index.tsx",
+      "description": "文件树构建逻辑，将扁平文件路径解析为 就诊/报告分类/文件 三层结构，按REPORT_ORDER排序",
+      "lines": "52-79",
+      "keyMethods": ["buildFileTree", "normalizeEncounterName", "normalizeReportName"]
+    },
+    {
+      "id": "type-patient-encounter",
+      "name": "PatientEncounter",
+      "type": "type",
+      "filePath": "frontend/src/types/index.ts",
+      "description": "患者就诊记录类型，包含入院/出院时间、类型和标签",
+      "fields": "admission, discharge, type?, label?, source_admission?, file_count?, prior_report_count?"
+    },
+    {
+      "id": "test-api",
+      "name": "api.test.ts",
+      "type": "test",
+      "filePath": "frontend/src/services/__tests__/api.test.ts",
+      "description": "parseSSE函数单元测试，覆盖9种场景：单个事件、多事件、不完整缓冲、空缓冲、tab_ready、error、done、缺省字段、中文字符",
+      "testFramework": "vitest"
+    },
+    {
+      "id": "test-stores",
+      "name": "stores.test.ts",
+      "type": "test",
+      "filePath": "frontend/src/store/__tests__/stores.test.ts",
+      "description": "四个Zustand Store单元测试：patientStore(8用例)、chatStore(6用例)、reportStore(5用例)、editStore(3用例)",
+      "testFramework": "vitest"
+    }
+  ],
+  "edges": [
+    {
+      "source": "component-chat-panel",
+      "target": "component-message-list",
+      "relationship": "子组件",
+      "detail": "渲染 MessageList，传入 messages 和 showThinking"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "component-chat-input",
+      "relationship": "子组件",
+      "detail": "渲染 ChatInput，传入 onSend(sendMessage) 和 disabled(isStreaming)"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "hook-use-chat",
+      "relationship": "Hook调用",
+      "detail": "调用 useChat(selectedId) 获取 sendMessage、generateReport、abort"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "store-patient",
+      "relationship": "Store读取",
+      "detail": "读取 selectedId、patients、selectedEncounter 及对应的 setter"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "store-chat",
+      "relationship": "Store读取",
+      "detail": "读取 messages、isStreaming，调用 addMessages、clearMessages、setThinkingTime"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "service-api",
+      "relationship": "API调用",
+      "detail": "调用 fetchChatHistory(selectedId) 加载历史消息"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "type-encounter-filter",
+      "relationship": "类型引用",
+      "detail": "用于 encounterLabel、handleSelectEncounter、generateReport 的参数类型"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "concept-encounter-selector",
+      "relationship": "包含概念",
+      "detail": "当 encounterList.length > 1 时显示就诊范围选择器"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "concept-conversation-tabs",
+      "relationship": "包含概念",
+      "detail": "聊天面板头部多患者对话标签页切换"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "concept-quick-actions-bar",
+      "relationship": "包含概念",
+      "detail": "底部快捷操作按钮区域"
+    },
+    {
+      "source": "component-message-list",
+      "target": "component-message-bubble",
+      "relationship": "子组件",
+      "detail": "遍历 messages 数组，为每条消息渲染 MessageBubble"
+    },
+    {
+      "source": "component-message-list",
+      "target": "type-chat-message",
+      "relationship": "类型引用",
+      "detail": "Props 中的 messages 数组类型"
+    },
+    {
+      "source": "component-message-bubble",
+      "target": "component-markdown-renderer",
+      "relationship": "子组件",
+      "detail": "助手消息的内容通过 MarkdownRenderer 渲染"
+    },
+    {
+      "source": "component-message-bubble",
+      "target": "store-chat",
+      "relationship": "Store读取",
+      "detail": "读取 thinkingTime 和 isStreaming 用于状态消息显示"
+    },
+    {
+      "source": "component-message-bubble",
+      "target": "type-chat-message",
+      "relationship": "类型引用",
+      "detail": "role 字段的 'user' | 'assistant' | 'status' 类型"
+    },
+    {
+      "source": "component-chat-input",
+      "target": "hook-use-chat",
+      "relationship": "间接调用",
+      "detail": "Props onSend 实际绑定 useChat 的 sendMessage 方法"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "component-add-patient-button",
+      "relationship": "子组件",
+      "detail": "在患者管理工具栏中渲染添加按钮"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "store-patient",
+      "relationship": "Store读写",
+      "detail": "读取/设置 patients、selectedId、files，调用 setPatients/selectPatient/removePatient/setFiles"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "service-api",
+      "relationship": "API调用",
+      "detail": "调用 fetchPatients 和 fetchPatientFiles"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "type-patient",
+      "relationship": "类型引用",
+      "detail": "患者列表和选中患者数据"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "type-patient-file",
+      "relationship": "类型引用",
+      "detail": "文件列表和文件树构建"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "concept-patient-tree",
+      "relationship": "包含概念",
+      "detail": "患者→就诊→报告→文件的4层树形展示"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "concept-file-tree-builder",
+      "relationship": "调用逻辑",
+      "detail": "通过 buildFileTree 将 files 转换为树结构"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "type-patient-encounter",
+      "relationship": "类型引用",
+      "detail": "就诊记录的 encounterDisplayName 格式化"
+    },
+    {
+      "source": "hook-use-chat",
+      "target": "store-chat",
+      "relationship": "Store读写",
+      "detail": "调用 addMessage/appendToLastMessage/appendReasoning/setStreaming/setLastEventId"
+    },
+    {
+      "source": "hook-use-chat",
+      "target": "store-report",
+      "relationship": "Store读写",
+      "detail": "调用 setTabData/setActiveTab/appendTabContent 处理 tab_ready 和 tab_content 事件"
+    },
+    {
+      "source": "hook-use-chat",
+      "target": "service-parse-sse",
+      "relationship": "调用",
+      "detail": "在 fetch ReadableStream 循环中解析 SSE 事件"
+    },
+    {
+      "source": "hook-use-chat",
+      "target": "type-sse-event",
+      "relationship": "类型引用",
+      "detail": "handleEvent 函数的 switch-case 分发 8 种事件类型"
+    },
+    {
+      "source": "hook-use-chat",
+      "target": "type-encounter-filter",
+      "relationship": "类型引用",
+      "detail": "generateReport 的可选参数类型"
+    },
+    {
+      "source": "hook-use-chat",
+      "target": "type-tab-name",
+      "relationship": "类型引用",
+      "detail": "tab_ready 和 tab_content 事件处理中的 TabName 断言"
+    },
+    {
+      "source": "service-api",
+      "target": "type-patient",
+      "relationship": "类型引用",
+      "detail": "fetchPatients 返回类型 Patient[]"
+    },
+    {
+      "source": "service-api",
+      "target": "type-patient-file",
+      "relationship": "类型引用",
+      "detail": "fetchPatientFiles 返回类型 PatientFile[]"
+    },
+    {
+      "source": "service-api",
+      "target": "type-chat-message",
+      "relationship": "类型引用",
+      "detail": "fetchChatHistory 返回类型 ChatMessage[]"
+    },
+    {
+      "source": "service-api",
+      "target": "type-sse-event",
+      "relationship": "类型引用",
+      "detail": "parseSSE 返回类型包含 SSEEvent[]"
+    },
+    {
+      "source": "service-api",
+      "target": "type-report-data",
+      "relationship": "类型引用",
+      "detail": "fetchReport 返回类型 ReportData"
+    },
+    {
+      "source": "service-parse-sse",
+      "target": "type-sse-event",
+      "relationship": "返回类型",
+      "detail": "解析结果包含 SSEEvent[]"
+    },
+    {
+      "source": "store-patient",
+      "target": "type-patient",
+      "relationship": "类型依赖",
+      "detail": "patients 字段使用 Patient[] 类型"
+    },
+    {
+      "source": "store-patient",
+      "target": "type-patient-file",
+      "relationship": "类型依赖",
+      "detail": "files 字段使用 PatientFile[] 类型"
+    },
+    {
+      "source": "store-chat",
+      "target": "type-chat-message",
+      "relationship": "类型依赖",
+      "detail": "messages 字段使用 ChatMessage[] 类型"
+    },
+    {
+      "source": "store-report",
+      "target": "type-report-data",
+      "relationship": "类型依赖",
+      "detail": "tabs 数据符合 ReportData 结构"
+    },
+    {
+      "source": "store-report",
+      "target": "type-tab-name",
+      "relationship": "类型依赖",
+      "detail": "activeTab 使用 TabName 类型"
+    },
+    {
+      "source": "test-api",
+      "target": "service-parse-sse",
+      "relationship": "测试覆盖",
+      "detail": "9个测试用例覆盖 parseSSE 的核心场景"
+    },
+    {
+      "source": "test-stores",
+      "target": "store-patient",
+      "relationship": "测试覆盖",
+      "detail": "8个测试用例覆盖 setPatients/selectPatient/setFiles 和自动选中逻辑"
+    },
+    {
+      "source": "test-stores",
+      "target": "store-chat",
+      "relationship": "测试覆盖",
+      "detail": "6个测试用例覆盖消息操作和流式状态管理"
+    },
+    {
+      "source": "test-stores",
+      "target": "store-report",
+      "relationship": "测试覆盖",
+      "detail": "5个测试用例覆盖标签页数据管理"
+    },
+    {
+      "source": "test-stores",
+      "target": "store-edit",
+      "relationship": "测试覆盖",
+      "detail": "3个测试用例覆盖编辑表单操作"
+    },
+    {
+      "source": "component-patient-list",
+      "target": "component-top-bar",
+      "relationship": "同级组件/布局相邻",
+      "detail": "PatientList 为侧边栏，TopBar 为顶部栏，在页面布局中相邻"
+    },
+    {
+      "source": "component-chat-panel",
+      "target": "store-patient",
+      "relationship": "Store写入",
+      "detail": "调用 selectPatient、removePatient、setSelectedEncounter 改变患者状态"
+    }
+  ]
+}

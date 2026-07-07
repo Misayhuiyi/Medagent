@@ -1,0 +1,101 @@
+[
+  {
+    "order": 1,
+    "title": "项目概览与系统入口",
+    "description": "MedAgent 是基于 LangGraph ReAct + FastAPI + React 的 AI 肺癌门诊系统。主入口 Code/main.py 支持 web / cli / blank 三种运行模式，前端入口 frontend/src/main.tsx 挂载 React 应用。了解双端入口有助于把握系统边界。",
+    "nodeIds": [
+      "file-main-py",
+      "frontend/src/main.tsx",
+      "concept:app-entry"
+    ]
+  },
+  {
+    "order": 2,
+    "title": "后端流水线引擎",
+    "description": "核心编排层：skill_executor.py 是 10 步报告生成管线的编排引擎，支持 Tab（并行）和 Pipeline（串行）双模式，内置 LLM 多候选自动故障转移。agent_manager.py 管理主/子 Agent 生命周期与并发调度。deep_agent.py 实现 LangGraph ReAct Agent 工厂，支持标准 ReAct 和顺序链两种模式。",
+    "nodeIds": [
+      "file:Code/DataCode/skill_executor.py",
+      "file:Code/DataCode/agent_manager.py",
+      "file:Code/DataCode/deep_agent.py"
+    ]
+  },
+  {
+    "order": 3,
+    "title": "工具系统与 Agent 调用链",
+    "description": "Agent 通过工具与外界交互。builtin_tools.py 提供文件读写（路径白名单）、PDF 转换、RAG 知识库查询、记忆持久化和任务管理等内建工具工厂。tool_registry.py 定义工具注册与 JSON Schema 转换。execute_tool.py 实现统一执行器（享元模式）与权限校验。llm_callback.py 追踪 LLM 调用历史。",
+    "nodeIds": [
+      "file:Code/DataCode/builtin_tools.py",
+      "file:Code/DataCode/tool_registry.py",
+      "file:Code/DataCode/execute_tool.py",
+      "file:Code/DataCode/llm_callback.py",
+      "arch-tool-registration"
+    ]
+  },
+  {
+    "order": 4,
+    "title": "医学知识库检索系统",
+    "description": "基于 ChromaDB + bge-m3 Embedding + bge-reranker-v2-m3 CrossEncoder 的循证医学知识库。kb_manager.py（2303 行）是核心引擎，实现索引构建、增量更新、父子分块、双路召回、多机构分机构检索和证据等级排序（Rank 1-8）。tool.py 封装业务层，agent.py 提供 LLM 驱动的语义问答。",
+    "nodeIds": [
+      "file-kb-manager-py",
+      "file-tool-py",
+      "file-agent-py",
+      "evidence-rank-system",
+      "arch-three-layer",
+      "arch-dual-recall",
+      "arch-hybrid-search",
+      "arch-multi-org-search"
+    ]
+  },
+  {
+    "order": 5,
+    "title": "Web API 路由层",
+    "description": "FastAPI 路由层将后端能力暴露为 HTTP 接口。chat.py 提供 SSE 流式对话（支持 chat/report/auto 三种模式）。patients.py 处理患者 CRUD 与文件上传。reports.py 提供报告读取、保存和多格式下载（md/html/pdf）。kb.py 支持知识库追溯查询（三级缓存）。debug.py 提供调试端点。",
+    "nodeIds": [
+      "file:web_routes/chat.py",
+      "file:web_routes/patients.py",
+      "file:web_routes/reports.py",
+      "file:web_routes/kb.py",
+      "file:web_routes/debug.py"
+    ]
+  },
+  {
+    "order": 6,
+    "title": "报告生成与 PDF 渲染",
+    "description": "报告生成流水线的下游环节。template_v4.py 定义 V4 版 HTML/CSS 报告模板（5 Tab 结构：概述、病史、治疗、预测、护理）。normalizer.py 对 Agent 输出的 JSON 数据进行归一化处理。pdf_renderer_v4.py 将 HTML 报告通过浏览器引擎渲染为 PDF 输出。",
+    "nodeIds": [
+      "file:reporting/template_v4.py",
+      "file:reporting/normalizer.py",
+      "file:reporting/pdf_renderer_v4.py"
+    ]
+  },
+  {
+    "order": 7,
+    "title": "前端应用面板",
+    "description": "React + TypeScript + Zustand 构建的三面板门诊工作台。App.tsx 定义 TopBar + 三栏 Grid 布局（患者列表、对话面板、报告面板）。types/index.ts 是全局类型中枢（360 行）。Zustand 四个 Store 管理患者/聊天/报告/编辑状态。api.ts 封装 SSE 流式调用。MarkdownRenderer 支持 KaTeX 公式、CSV 自动转表格。",
+    "nodeIds": [
+      "frontend/src/App.tsx",
+      "frontend/src/types/index.ts",
+      "frontend/src/store/index.ts",
+      "frontend/src/services/api.ts",
+      "frontend/src/hooks/useChat.ts",
+      "frontend/src/components/common/MarkdownRenderer.tsx",
+      "concept:layout",
+      "concept:state-management",
+      "concept:sse-stream",
+      "concept:report-system"
+    ]
+  },
+  {
+    "order": 8,
+    "title": "配置体系与部署脚本",
+    "description": "YAML 驱动的分层配置体系。platform.yaml 定义平台级配置（LLM、路径、安全），pipeline.yaml 定义 10 步流水线步骤与技能 SKILL.md 映射。llm-config 管理 DeepSeek 等模型参数，sandbox 定义命令/网络黑名单。scripts/batch_pdf_to_md.py 批量将 PDF 病历转换为 Markdown，用于离线数据预处理。",
+    "nodeIds": [
+      "platform.yaml",
+      "pipeline.yaml",
+      "llm-config",
+      "sandbox",
+      "memory-context",
+      "file:scripts/batch_pdf_to_md.py"
+    ]
+  }
+]

@@ -281,7 +281,13 @@ def report_to_markdown(report: dict, title: str = REPORT_TITLE,
         name = patient_info.get("name", "")
         sex = patient_info.get("sex") or patient_info.get("gender", "")
         age = str(patient_info.get("age", ""))
-        pid = patient_info.get("id", patient_info.get("patient_id", ""))
+        pid = (
+            patient_info.get("patient_id")
+            or patient_info.get("outpatient_no")
+            or patient_info.get("visit_number")
+            or patient_info.get("medical_record_no")
+            or patient_info.get("id", "")
+        )
         phone = patient_info.get("phone", "")
 
         lines.append(f"**科室**：{dept}  **就诊日期**：{visit_date}")
