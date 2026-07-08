@@ -8,24 +8,26 @@
 |------|------|
 | Agent 框架 | LangGraph ReAct + 隔离子 Agent 并行调度 |
 | 后端 API | FastAPI + SSE 流式 |
-| 向量检索 | ChromaDB + BAAI/bge-small-zh-v1.5 |
-| 知识库 | 127 份医学指南/共识 |
+| 向量检索 | ChromaDB + Ollama bge-m3（1024维） |
+| 知识库 | 279 篇医学指南/共识，44307 文档块 |
+| 精排 | CrossEncoder bge-reranker-v2-m3（可选） |
 | 前端 UI | React 19 + TypeScript + Ant Design 6 |
 | 状态管理 | Zustand 5 |
 | 图表 | ECharts 6 + echarts-for-react |
-| 报告生成 | Markdown / HTML / PDF (fpdf2) |
+| 报告生成 | Markdown / HTML / PDF（Playwright > Edge > wkhtmltopdf > fpdf2） |
+| 代码理解 | Understand Anything 插件（已安装，知识图谱就绪） |
 | 构建工具 | Vite 8 |
 | 容器化 | Docker + docker compose |
-| Python 管理 | uv / pip (pyproject.toml) |
 
 ## 功能特性
 
 - **PDF 智能解析**：自动 OCR 提取患者病历资料（影像/检验/病理/病历/医生诊疗）
 - **10 步 Agent 流水线**：资料整理 → 预处理 → 场景判断 → 病史总结 → 患者概况 → 治疗方案 → 疗效预测 → 其他建议 → 报告生成
 - **子 Agent 并行加速**：多子任务并行执行，总耗时从 44 分钟优化至 3-5 分钟
-- **RAG 知识库检索**：基于 ChromaDB 的语义检索，支持 NCCN/CSCO/ESMO/ASCO 等权威指南引用
-- **就诊范围选择**：支持按就诊时间筛选，生成单次或综合报告
+- **RAG 知识库检索**：基于 ChromaDB + Ollama bge-m3 的语义检索，支持 NCCN/CSCO/ESMO/ASCO 等 279 篇权威指南引用（44307 文档块）
+- **就诊范围选择**：支持按就诊时间筛选（45 天规则自动分组），生成单次或综合报告
 - **5 个结构化的报告标签页**：患者病史、患者概况、治疗方案、疗效预测、其他建议
+- **临床语义高亮**：自动识别医学术语并着色（红色=不良反应、蓝色=肿瘤负荷、绿色=治疗疗效）
 - **证据等级标注**：每条引用标注来源及证据等级（国际指南 / 国内指南 / 专家共识等）
 - **多 LLM 候选容灾**：多个 API Key 自动切换，认证失败/超时自动降级
 - **SSE 流式推送**：前端实时更新报告进度，支持运行时序图可视化
@@ -213,25 +215,28 @@ cd frontend && npm install && npm run dev
 ## 知识库
 
 - **向量数据库**：ChromaDB（`Data/knowledge_base/chroma_db/`）
-- **嵌入模型**：BAAI/bge-small-zh-v1.5（384 维）
-- **文档规模**：121 份 PDF，29,013 个文档块
+- **嵌入模型**：Ollama bge-m3（1024 维），使用本地 Ollama 服务（`:11434`）
+- **重排序**：可选 CrossEncoder bge-reranker-v2-m3（设置 `KB_ENABLE_RERANKER=1` 启用）
+- **文档规模**：279 篇医学指南/共识，44,307 个文档块
 - **内容覆盖**：
   - 国际指南：NCCN（NSCLC/SCLC）、ESMO、ASCO
-  - 国内指南：CSCO 肺癌诊疗指南
+  - 国内指南：CSCO 肺癌诊疗指南、CACA 指南
   - 分期标准：TNM 第九版、iRECIST
   - 不良反应：CTCAE 6.0 标准
-  - 专家共识：中国肺癌专家共识 30+ 份
-- **证据等级**：8 级映射（国际指南→国内指南→专家共识→RCT→真实世界研究→病例报告→专家意见）
+  - 专家共识：SITC irAE 管理共识等
+- **证据等级**：8 级映射（国际指南→国内指南→国际学会→专家共识→RCT→真实世界研究→病例报告→专家意见）
+- **查询增强**：双语扩展（中文→英文同义词）+ 意图解析（biomarker/stage/line）+ 多机构均衡
 
 ### 扩建知识库
 
 如需添加新的医学指南/PDF 到知识库：
 
 ```bash
-cd 更新/folder-rag/folder-rag
-pip install -r requirements.txt
-python scripts/run_index.py --folder "D:\新PDF目录" --force
-# 将生成的 database/chroma_db/ 复制到 MedAgentNEW/Data/knowledge_base/
+# 需要完整知识库构建环境（指南源文件 + Ollama）
+# 当前知识库由 kb_manager.py 管理
+cd Data/knowledge_base
+# 查看索引状态
+python kb_manager.py status
 ```
 
 ## API 接口一览
@@ -284,15 +289,40 @@ evidence_mapping:             # 证据等级映射
 | `DEEPSEEK_API_KEY` | 否 | - | DeepSeek 备用密钥 |
 | `OPENAI_API_KEY` | 否 | - | OpenAI 备用密钥 |
 | `PORT` | 否 | `8000` | 后端服务端口 |
+| `KB_COLLECTION_NAME` | 否 | `medical_guidelines_v2` | ChromaDB 集合名 |
+| `KB_ENABLE_RERANKER` | 否 | 空 | 设为 `1` 启用 CrossEncoder 精排 |
+| `MEDAGENT_KB_TOP_K` | 否 | `8` | 报告生成默认 KB 注入量 |
+| `MEDAGENT_CHROMIUM_PATH` | 否 | 自动查找 | Edge/Chrome 路径（PDF 打印） |
+| `MEDAGENT_PDF_TMP_DIR` | 否 | 系统临时目录 | PDF 渲染临时目录 |
+| `MEDAGENT_FONT_PATH` | 否 | 自动查找 | fpdf2 回退中文字体路径 |
 
-## 当前状态
+## 当前状态（V3.6）
 
-- **阶段一（框架提取）**：✅ 完成 — 空白 Agent 框架提取，硬编码全量清零
-- **阶段二（肺癌医生流程集成）**：✅ 完成 — 10 步 Pipeline + 40+ Skill + ChromaDB 知识库
-  - V2.0-V2.4 共 20+ 轮迭代优化
-  - 报告生成 44 分钟 → **3-5 分钟**
-  - 支持张三/李四/王五/刘海平 4 患者测试验证
+- **阶段一（框架提取）**：✅ 完成
+- **阶段二（肺癌医生流程集成）**：✅ **全部完成（含 20+ 轮迭代修复）**
+  - 报告生成 44 分钟 → **3-5 分钟**（快速模式）
+  - 覆盖 4 名患者（张三/李四/王五/刘海平，共 147 份 PDF）
+  - PDF 导出对齐 old_MedAgent（Playwright Chromium 高保真）
+  - 知识库 279 篇指南，Ollama bge-m3 1024 维嵌入
+  - 前端语义高亮（ClinicalText autoHighlights 红/蓝/绿标记）
+  - 完整迭代至 V3.6（normalizer 噪声过滤、pdf_renderer 安全加固）
 - **阶段三（全面重构 + RAG→SAG 升级）**：📋 待开始
+  - 上传患者资料执行方案已定（P0-P4 分阶段实施）
+  - 上传与 OCR 闭环、报告生成链路完善待开发
+
+## Understand Anything 集成
+
+本项目已安装 Understand Anything 插件（v2.8.2）并完成全量分析，生成交互式知识图谱：
+
+- **节点**：468（文件/函数/类/概念）
+- **边**：597（依赖/调用/导入/数据流）
+- **架构层**：12（后端核心 → 前端组件 → 部署流水线）
+- **导览步**：8（从项目入口到部署配置）
+
+启动仪表盘（双击桌面 `run_dashboard.ps1`）：
+```
+http://127.0.0.1:5173/?token=medagent2026
+```
 
 ## 安全设计
 
