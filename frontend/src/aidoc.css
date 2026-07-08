@@ -1817,6 +1817,156 @@ textarea {
 .app-shell.aidoc-v2 .clinical-text__table table {
   table-layout: auto;
 }
+.app-shell.aidoc-v2 .clinical-text__table--compact {
+  margin-top: 6px;
+}
+.app-shell.aidoc-v2 .clinical-text__table--compact table {
+  font-size: 11px;
+}
+.app-shell.aidoc-v2 .clinical-chart {
+  width: 100%;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--aidoc-border);
+  background: #fff;
+  overflow: hidden;
+}
+.app-shell.aidoc-v2 .clinical-chart__summary {
+  margin-bottom: 8px;
+  color: var(--aidoc-text);
+  font-size: 13px;
+  line-height: 21px;
+}
+.app-shell.aidoc-v2 .clinical-chart__svg {
+  width: 100%;
+  height: auto;
+  min-height: 210px;
+  display: block;
+}
+.app-shell.aidoc-v2 .clinical-chart__grid {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+.app-shell.aidoc-v2 .clinical-chart__axis {
+  stroke: #333;
+  stroke-width: 1.2;
+}
+.app-shell.aidoc-v2 .clinical-chart__line {
+  fill: none;
+  stroke: #095db7;
+  stroke-width: 2.4;
+}
+.app-shell.aidoc-v2 .clinical-chart__dot {
+  fill: #095db7;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+.app-shell.aidoc-v2 .clinical-chart__svg text {
+  fill: #333;
+  font-size: 11px;
+}
+.app-shell.aidoc-v2 .clinical-chart__axis-title {
+  font-weight: 600;
+}
+.app-shell.aidoc-v2 .clinical-risk {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(88px, 1.1fr) 54px minmax(86px, 1fr) 54px minmax(120px, 1.4fr);
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f3f5;
+  color: var(--aidoc-text);
+  font-size: 12px;
+  line-height: 18px;
+}
+.app-shell.aidoc-v2 .clinical-risk:last-of-type {
+  border-bottom: none;
+}
+.app-shell.aidoc-v2 .clinical-risk b,
+.app-shell.aidoc-v2 .clinical-risk strong {
+  font-weight: 600;
+}
+.app-shell.aidoc-v2 .clinical-risk i {
+  height: 8px;
+  border-radius: 999px;
+  display: block;
+  overflow: hidden;
+  background: #eef1f5;
+}
+.app-shell.aidoc-v2 .clinical-risk i em {
+  height: 100%;
+  border-radius: inherit;
+  display: block;
+  background: #12733a;
+}
+.app-shell.aidoc-v2 .clinical-risk small {
+  color: var(--aidoc-text-secondary);
+  font-size: 12px;
+}
+.app-shell.aidoc-v2 .clinical-risk--medium i em {
+  background: #ff9500;
+}
+.app-shell.aidoc-v2 .clinical-risk--high i em {
+  background: #c8271f;
+}
+.app-shell.aidoc-v2 .clinical-risk--low strong {
+  color: #12733a;
+}
+.app-shell.aidoc-v2 .clinical-risk--medium strong {
+  color: #a86500;
+}
+.app-shell.aidoc-v2 .clinical-risk--high strong {
+  color: #c8271f;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__legend {
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--aidoc-text-secondary);
+  font-size: 12px;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__row {
+  display: grid;
+  gap: 4px;
+  align-items: stretch;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__row strong,
+.app-shell.aidoc-v2 .clinical-heatmap__cell {
+  min-height: 28px;
+  padding: 5px 6px;
+  border: 1px solid var(--aidoc-border);
+  display: flex;
+  align-items: center;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__row strong {
+  font-weight: 600;
+  background: #fff;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__cell {
+  justify-content: center;
+  font-weight: 600;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__cell--g0 {
+  background: #f0faf3;
+  color: #12733a;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__cell--g1 {
+  background: #e6f4ff;
+  color: #095db7;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__cell--g2 {
+  background: #fff4d8;
+  color: #a86500;
+}
+.app-shell.aidoc-v2 .clinical-heatmap__cell--g3,
+.app-shell.aidoc-v2 .clinical-heatmap__cell--g4 {
+  background: #ffe9e7;
+  color: #c8271f;
+}
 .app-shell.aidoc-v2 .treatment-rich-text__heading {
   margin: 10px 0 6px;
   color: var(--aidoc-text);

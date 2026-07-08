@@ -157,6 +157,9 @@ def _render_table(lines: Iterable[str]) -> str:
         rows.append(cells)
     if not rows:
         return ""
+    chart_html = _render_chart_table(rows)
+    if chart_html:
+        return chart_html
     header = rows[0]
     body = rows[1:]
     col_count = max(1, len(header))
@@ -179,6 +182,172 @@ def _render_table(lines: Iterable[str]) -> str:
             html_rows.append("<tr>" + "".join(f"<td>{_inline(cell)}</td>" for cell in row) + "</tr>")
         html_rows.append("</tbody>")
     return '<div class="table-wrap"><table>' + "".join(html_rows) + "</table></div>"
+
+
+def _render_chart_table(rows: list[list[str]]) -> str:
+    header = [cell.strip() for cell in rows[0]]
+    body = rows[1:]
+    if {"时间点", "指标", "数值", "单位"}.issubset(set(header)):
+        return _render_trend_visual(header, body)
+    if {"不良反应", "预测概率", "风险等级"}.issubset(set(header)):
+        return _render_risk_visual(header, body)
+    if header[:2] == ["不良反应", "T1"] and "等级说明" in header:
+        return _render_heatmap_visual(header, body)
+    return ""
+
+
+def _cell(row: list[str], header: list[str], name: str) -> str:
+    try:
+        index = header.index(name)
+    except ValueError:
+        return ""
+    return row[index].strip() if index < len(row) else ""
+
+
+def _number(text: str) -> float | None:
+    match = re.search(r"-?\d+(?:\.\d+)?", str(text or ""))
+    return float(match.group(0)) if match else None
+
+
+def _render_trend_visual(header: list[str], body: list[list[str]]) -> str:
+    points_by_metric: dict[str, list[tuple[str, float, str, str]]] = {}
+    for row in body:
+        metric = _cell(row, header, "指标") or "指标"
+        label = _cell(row, header, "时间点") or f"T{len(points_by_metric.get(metric, [])) + 1}"
+        value = _number(_cell(row, header, "数值"))
+        if value is None:
+            continue
+        unit = _cell(row, header, "单位")
+        note = _cell(row, header, "临床解释")
+        points_by_metric.setdefault(metric, []).append((label, value, unit, note))
+    if not points_by_metric:
+        return ""
+    metric, points = max(points_by_metric.items(), key=lambda item: len(item[1]))
+    if len(points) < 2:
+        return ""
+
+    width, height = 650, 270
+    left, right, top, bottom = 58, 24, 26, 48
+    plot_w, plot_h = width - left - right, height - top - bottom
+    values = [point[1] for point in points]
+    max_v = max(values)
+    min_v = min(values)
+    if abs(max_v - min_v) < 1e-9:
+        max_v += 1
+        min_v -= 1
+    pad = (max_v - min_v) * 0.12
+    max_v += pad
+    min_v -= pad
+
+    def xy(index: int, value: float) -> tuple[float, float]:
+        x = left + plot_w * index / max(len(points) - 1, 1)
+        y = top + plot_h - (value - min_v) / (max_v - min_v) * plot_h
+        return x, y
+
+    coords = [xy(index, point[1]) for index, point in enumerate(points)]
+    polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
+    unit = next((point[2] for point in points if point[2]), "")
+    first, last = points[0], points[-1]
+    delta = last[1] - first[1]
+    direction = "上升" if delta > 0 else "下降" if delta < 0 else "稳定"
+    summary = f"{metric}：{first[0]} {first[1]:g}{unit}，{last[0]} {last[1]:g}{unit}，总体{direction} {abs(delta):g}{unit}。"
+    grid = "".join(
+        f'<line x1="{left}" y1="{top + plot_h * i / 4:.1f}" x2="{width - right}" y2="{top + plot_h * i / 4:.1f}" />'
+        for i in range(5)
+    )
+    markers = []
+    labels = []
+    for index, (label, value, _, _note) in enumerate(points):
+        x, y = coords[index]
+        markers.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4.2" />')
+        labels.append(
+            f'<text x="{x:.1f}" y="{height - 24}" text-anchor="middle">{_e(label)}</text>'
+            f'<text x="{x:.1f}" y="{y - 8:.1f}" text-anchor="middle">{value:g}{_e(unit)}</text>'
+        )
+    compact_rows = [
+        "| 时间点 | 数值 | 趋势 | 解释 |",
+        "|---|---:|---|---|",
+        *[
+            f"| {label} | {value:g}{unit} | {_cell(row, header, '变化趋势')} | {_cell(row, header, '临床解释')} |"
+            for row, (label, value, unit, _note) in zip(body, points)
+        ],
+    ]
+    return f"""<div class="chart-visual chart-visual--trend">
+  <div class="chart-summary">{_inline(summary)}</div>
+  <svg class="clinical-svg-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{_e(metric)}趋势图">
+    <g class="grid">{grid}</g>
+    <line class="axis" x1="{left}" y1="{top}" x2="{left}" y2="{height - bottom}" />
+    <line class="axis" x1="{left}" y1="{height - bottom}" x2="{width - right}" y2="{height - bottom}" />
+    <polyline class="trend-line" points="{polyline}" />
+    <g class="trend-dots">{''.join(markers)}</g>
+    <g class="trend-labels">{''.join(labels)}</g>
+    <text class="axis-title" x="12" y="18">{_e(metric)} / {_e(unit)}</text>
+  </svg>
+  {_render_plain_table(compact_rows)}
+</div>"""
+
+
+def _render_risk_visual(header: list[str], body: list[list[str]]) -> str:
+    rows = []
+    for row in body:
+        name = _cell(row, header, "不良反应") or "未命名"
+        probability = _cell(row, header, "预测概率")
+        value = _number(probability) or 0
+        risk = _cell(row, header, "风险等级")
+        monitor = _cell(row, header, "监测建议")
+        action = _cell(row, header, "处理建议")
+        color = "red" if "高" in risk or value >= 30 else "orange" if "中" in risk or value >= 10 else "green"
+        rows.append(
+            f'<div class="risk-row risk-row--{color}"><span>{_inline(name)}</span>'
+            f'<b>{_e(probability)}</b><i style="width:{min(value, 100):.0f}%"></i>'
+            f'<em>{_inline(risk)}</em><small>{_inline(monitor or action)}</small></div>'
+        )
+    if not rows:
+        return ""
+    return '<div class="chart-visual chart-visual--risk">' + "".join(rows) + _render_plain_table(_rows_to_markdown(header, body)) + "</div>"
+
+
+def _render_heatmap_visual(header: list[str], body: list[list[str]]) -> str:
+    time_cols = [name for name in header if re.fullmatch(r"T\d+", name)]
+    if not time_cols:
+        return ""
+    cards = []
+    for row in body:
+        name = _cell(row, header, "不良反应")
+        cells = []
+        for col in time_cols:
+            value = _cell(row, header, col)
+            grade = int(_number(value) or 0)
+            cells.append(f'<span class="heat-cell heat-cell--g{max(0, min(4, grade))}">{_e(value or "-")}</span>')
+        cards.append(f'<div class="heat-row"><strong>{_inline(name)}</strong>{"".join(cells)}</div>')
+    legend = '<div class="heat-legend"><span>0 无</span><span>1 轻度</span><span>2 中度</span><span>3 重度</span><span>4 危重</span></div>'
+    return '<div class="chart-visual chart-visual--heatmap">' + legend + "".join(cards) + _render_plain_table(_rows_to_markdown(header, body)) + "</div>"
+
+
+def _rows_to_markdown(header: list[str], body: list[list[str]]) -> list[str]:
+    return [
+        "| " + " | ".join(header) + " |",
+        "| " + " | ".join("---" for _ in header) + " |",
+        *["| " + " | ".join(row[:len(header)] + [""] * max(0, len(header) - len(row))) + " |" for row in body],
+    ]
+
+
+def _render_plain_table(lines: list[str]) -> str:
+    rows = []
+    for line in lines:
+        if re.match(r"^\|[-: |]+\|$", line):
+            continue
+        rows.append([cell.strip() for cell in line.strip("|").split("|")])
+    if not rows:
+        return ""
+    header = rows[0]
+    body = rows[1:]
+    return (
+        '<div class="table-wrap chart-data-table"><table>'
+        + "<thead><tr>" + "".join(f"<th>{_inline(cell)}</th>" for cell in header) + "</tr></thead>"
+        + "<tbody>" + "".join("<tr>" + "".join(f"<td>{_inline(cell)}</td>" for cell in row) + "</tr>" for row in body) + "</tbody>"
+        + "</table></div>"
+    )
 
 
 def _inline(text: str) -> str:
@@ -723,6 +892,135 @@ code {
   color: #333;
   font-size: 10.5px;
   line-height: 1.55;
+}
+
+.chart-visual {
+  margin: 3px 0 6px;
+  padding: 5px 6px;
+  border: 1px solid #777;
+  background: #fff;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.clinical-svg-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.chart-data-table {
+  margin-top: 4px;
+}
+
+.chart-data-table table {
+  font-size: 8.8px;
+}
+
+.risk-row {
+  min-height: 28px;
+  margin: 3px 0;
+  display: grid;
+  grid-template-columns: 92px 48px 1fr 44px 1.4fr;
+  gap: 5px;
+  align-items: center;
+  font-size: 9.3px;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.risk-row b,
+.risk-row em,
+.risk-row small {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.risk-row small {
+  color: #333;
+  font-weight: 400;
+}
+
+.risk-row i {
+  height: 8px;
+  border-radius: 0;
+  display: block;
+  background: #2e7d32;
+}
+
+.risk-row--orange i {
+  background: #ef8f00;
+}
+
+.risk-row--red i {
+  background: #d32f2f;
+}
+
+.risk-row--green em {
+  color: #2e7d32;
+}
+
+.risk-row--orange em {
+  color: #8a5a00;
+}
+
+.risk-row--red em {
+  color: #d32f2f;
+}
+
+.heat-legend {
+  margin-bottom: 5px;
+  display: flex;
+  gap: 8px;
+  font-size: 9px;
+}
+
+.heat-row {
+  display: grid;
+  grid-template-columns: 94px repeat(5, 1fr);
+  gap: 3px;
+  align-items: stretch;
+  margin: 3px 0;
+  font-size: 9.2px;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.heat-row strong {
+  padding: 3px 4px;
+  border: 1px solid #999;
+  font-weight: 700;
+}
+
+.heat-cell {
+  min-height: 20px;
+  padding: 3px 2px;
+  border: 1px solid #999;
+  text-align: center;
+  font-weight: 700;
+}
+
+.heat-cell--g0 {
+  background: #f3f7f3;
+  color: #2e7d32;
+}
+
+.heat-cell--g1 {
+  background: #e8f3ff;
+  color: #1976d2;
+}
+
+.heat-cell--g2 {
+  background: #fff5d9;
+  color: #8a5a00;
+}
+
+.heat-cell--g3,
+.heat-cell--g4 {
+  background: #fde3e1;
+  color: #d32f2f;
 }
 
 .mark-red {

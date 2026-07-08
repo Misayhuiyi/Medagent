@@ -1099,7 +1099,7 @@ def _extract_chart_tables_from_text(text: str) -> str:
     parts: list[str] = []
     if direct_trend:
         parts.append(direct_trend)
-    for marker in ("### 文本图降级趋势表", "### 不良反应严重程度热力图（矩阵表）"):
+    for marker in ("### 结构化趋势图", "### 文本图降级趋势表", "### 不良反应严重程度热力图（矩阵表）"):
         pos = converted.find(marker)
         if pos >= 0:
             next_pos = min([p for p in (converted.find("### ", pos + 4),) if p >= 0] or [len(converted)])
@@ -1118,14 +1118,14 @@ def _direct_metric_trend_table(text: str) -> str:
             value = _clinical_number(value_text)
             if value is None:
                 continue
-            rows.append(["未明确", metric, _format_number(value, unit), unit, "旧文本图降级提取", _clinical_explanation(metric, value, unit)])
+            rows.append(["未明确", metric, _format_number(value, unit), unit, "原文本图提取", _clinical_explanation(metric, value, unit)])
     for value_text in _unique_numbers(re.findall(r"(\d+(?:\.\d+)?)\s*mm", text, re.I))[:8]:
         value = _clinical_number(value_text)
         if value is not None:
-            rows.append(["未明确", "肿瘤最大径", _format_number(value, "mm"), "mm", "旧文本图降级提取", _clinical_explanation("肿瘤最大径", value, "mm")])
+            rows.append(["未明确", "肿瘤最大径", _format_number(value, "mm"), "mm", "原文本图提取", _clinical_explanation("肿瘤最大径", value, "mm")])
     if not rows:
         return ""
-    return "### 文本图降级趋势表\n\n" + _trend_rows_to_markdown(rows)
+    return "### 结构化趋势图\n\n" + _trend_rows_to_markdown(rows)
 
 
 def _unique_numbers(values: list[str]) -> list[str]:
@@ -1450,11 +1450,11 @@ def _convert_ascii_metric_lines_to_table(text: str) -> str:
             number = _clinical_number(value)
             if number is None:
                 continue
-            rows.append(["未明确", metric, _format_number(number, unit), unit, "旧文本图降级提取", _clinical_explanation(metric, number, unit)])
+            rows.append(["未明确", metric, _format_number(number, unit), unit, "原文本图提取", _clinical_explanation(metric, number, unit)])
     if not rows:
         return text
     table = _trend_rows_to_markdown(rows)
-    return "\n\n".join(["### 文本图降级趋势表", table, *kept])
+    return "\n\n".join(["### 结构化趋势图", table, *kept])
 
 
 def _metric_block_rows(lines: list[str]) -> tuple[list[list[str]], set[str]]:
@@ -1478,7 +1478,7 @@ def _metric_block_rows(lines: list[str]) -> tuple[list[list[str]], set[str]]:
             if value is None:
                 continue
             metric_unit = _unit_for_metric(metric) or unit
-            rows.append(["未明确", metric, _format_number(value, metric_unit), metric_unit, "旧文本图降级提取", _clinical_explanation(metric, value, metric_unit)])
+            rows.append(["未明确", metric, _format_number(value, metric_unit), metric_unit, "原文本图提取", _clinical_explanation(metric, value, metric_unit)])
         current_name = ""
         current_body = []
 

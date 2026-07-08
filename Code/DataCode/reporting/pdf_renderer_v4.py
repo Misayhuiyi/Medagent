@@ -114,6 +114,11 @@ def _html_to_pdf_with_browser(html: str, browser_path: str) -> bytes:
         html_path = tmp_path / "report.html"
         pdf_path = tmp_path / "report.pdf"
         profile_dir = tmp_path / "profile"
+        crash_dir = tmp_path / "crash"
+        cache_dir = tmp_path / "cache"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        crash_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
         html_path.write_text(html, encoding="utf-8")
 
         args = [
@@ -133,6 +138,8 @@ def _html_to_pdf_with_browser(html: str, browser_path: str) -> bytes:
             "--disable-logging",
             "--no-first-run",
             "--no-default-browser-check",
+            f"--disk-cache-dir={cache_dir}",
+            f"--crash-dumps-dir={crash_dir}",
             f"--user-data-dir={profile_dir}",
             f"--print-to-pdf={pdf_path}",
             "--print-to-pdf-no-header",
@@ -149,6 +156,7 @@ def _html_to_pdf_with_browser(html: str, browser_path: str) -> bytes:
             errors="replace",
             timeout=45,
             check=False,
+            env={**os.environ, "TEMP": str(tmp_path), "TMP": str(tmp_path), "TMPDIR": str(tmp_path)},
         )
         if completed.returncode != 0:
             raise RuntimeError(
@@ -216,7 +224,9 @@ def _pdf_tmp_parent() -> Path:
     candidates = []
     if configured:
         candidates.append(Path(configured))
+    project_root = Path(__file__).resolve().parents[3]
     candidates.extend([
+        project_root / "Result" / "tmp" / "pdf",
         Path.cwd() / "Result" / "tmp" / "pdf",
         Path(tempfile.gettempdir()) / "medagent_pdf",
     ])
